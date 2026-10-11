@@ -1,2 +1,1 @@
-Broiler chicks — Joe Valbuena / USDA. Public domain (US federal government work).
-Source: https://commons.wikimedia.org/wiki/File:Broiler_chicks.jpg
+Landing image: AI-generated chick photograph created for Hatchery Insights, 11 October 2026.

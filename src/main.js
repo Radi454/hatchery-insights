@@ -40,9 +40,9 @@ const monthKey = date => date ? String(date).slice(0, 7) : '';
 
 function renderShell() {
   app.innerHTML = `
-    <header class="topbar"><div class="brand" aria-label="Hatchery Insights"><span class="brand-mark" aria-hidden="true">م</span><span class="brand-copy">Hatchery Insights<small>متابعة معامل التفريخ</small></span></div><div id="session-tools"></div></header>
+    <header class="topbar"><div class="brand" aria-label="Hatchery Insights"><span class="brand-copy">Hatchery Insights<small>تقارير التحصين</small></span></div><div id="session-tools"></div></header>
     <main id="main-content" class="container"></main>
-    <footer class="footer"><span>مساحة عمل داخلية</span><span>مصدر البيانات: تقارير معامل التفريخ</span></footer>
+    <footer class="footer"><span>تقارير معامل التفريخ</span></footer>
     <dialog id="batch-dialog" class="dialog"><div id="dialog-content"></div></dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>`;
 }
@@ -51,19 +51,19 @@ function renderLogin() {
   document.querySelector('#session-tools').innerHTML = '';
   document.querySelector('#main-content').classList.add('login-main');
   document.querySelector('#main-content').innerHTML = `
-    <section class="login-page" aria-label="تسجيل الدخول إلى لوحة التحصين">
-      <div class="login-visual"><img src="${import.meta.env.BASE_URL}assets/chicks.jpg" alt="كتاكيت في المفرخ"><div class="login-visual-copy"><span>معامل التفريخ</span><h2>متابعة أوضح<br>لتحصين الدواجن</h2><p>لوحة داخلية لمراجعة التقارير والدفعات المسجلة.</p></div></div>
+    <section class="login-page" aria-label="تسجيل الدخول">
+      <div class="login-visual"><img src="${import.meta.env.BASE_URL}assets/chicks.jpg" alt="كتاكيت"><div class="login-visual-copy"><span>Hatchery Insights</span><h2>تقارير التحصين</h2></div></div>
       <div class="login-side"><form id="login-form" class="login-card">
-      <div class="login-emblem" aria-hidden="true">م</div><div class="eyebrow">بوابة آمنة</div><h1>أهلًا بك</h1><p class="muted">سجّل الدخول لمتابعة بيانات معامل التفريخ.</p>
-      ${!supabaseConfigured ? `<div class="alert error">${escapeHtml(supabaseConfigError || 'إعداد الاتصال غير مكتمل. أضف VITE_SUPABASE_URL ومفتاحًا عامًا يبدأ بـ sb_publishable_ إلى بيئة التشغيل.')}</div>` : ''}
+      <h1>تسجيل الدخول</h1>
+      ${!supabaseConfigured ? `<div class="alert error">${escapeHtml(supabaseConfigError ? 'إعداد مفتاح الخدمة غير صالح.' : 'تعذر الاتصال بالخدمة.')}</div>` : ''}
       ${state.error ? `<div class="alert error" role="alert">${escapeHtml(state.error)}</div>` : ''}
       <label>البريد الإلكتروني<input name="email" type="email" autocomplete="username" value="${escapeHtml(state.otpEmail)}" required ${!supabaseConfigured || state.loading ? 'disabled' : ''}></label>
-      ${state.authMode === 'password' ? `<label>كلمة المرور<input name="password" type="password" autocomplete="current-password" required ${state.loading ? 'disabled' : ''}></label>` : state.authMode === 'code' ? `<label>رمز البريد الإلكتروني<input name="token" inputmode="numeric" autocomplete="one-time-code" required ${state.loading ? 'disabled' : ''}></label><p class="muted">افتح رابط الدخول من رسالة البريد. وإذا كانت الرسالة تحتوي على رمز، يمكنك إدخاله هنا.</p>` : '<p class="muted">هنرسل رابط دخول إلى بريد حسابك الحالي. افتح الرابط من الرسالة للمتابعة.</p>'}
+      ${state.authMode === 'password' ? `<label>كلمة المرور<input name="password" type="password" autocomplete="current-password" required ${state.loading ? 'disabled' : ''}></label>` : state.authMode === 'code' ? `<label>رمز البريد الإلكتروني<input name="token" inputmode="numeric" autocomplete="one-time-code" required ${state.loading ? 'disabled' : ''}></label><p class="muted">أدخل الرمز أو افتح رابط الدخول في بريدك.</p>` : '<p class="muted">أرسل رابط الدخول إلى بريدك.</p>'}
       <button class="button primary full" type="submit" ${!supabaseConfigured || state.loading ? 'disabled' : ''}>${state.loading ? 'جارٍ التحقق…' : state.authMode === 'password' ? 'تسجيل الدخول' : state.authMode === 'code' ? 'التحقق من الرمز' : 'إرسال رابط الدخول'}</button>
       ${state.authMode === 'password' ? '<button id="otp-mode" class="button quiet full" type="button">الدخول عبر البريد</button>' : state.authMode === 'otp-email' ? '<button id="code-entry" class="button quiet full" type="button">لدي رمز دخول</button>' : '<button id="resend-otp" class="button quiet full" type="button">إرسال رمز جديد</button>'}
       ${state.authMode !== 'password' ? '<button id="password-mode" class="button quiet full" type="button">الدخول بكلمة المرور</button>' : ''}
-      <p class="fineprint">الدخول متاح للحسابات المصرح بها فقط. إنشاء الحسابات غير متاح من هذه الصفحة.</p>
-      </form><p class="login-footnote">لوحة داخلية لمتابعة تقارير التحصين</p></div>
+      <p class="fineprint">للحسابات المصرح بها فقط.</p>
+      </form></div>
     </section>`;
   document.querySelector('#login-form')?.addEventListener('submit', signIn);
   document.querySelector('#otp-mode')?.addEventListener('click', () => { state.otpEmail = document.querySelector('[name="email"]')?.value || ''; state.authMode = 'otp-email'; state.error = ''; renderLogin(); });
@@ -88,7 +88,7 @@ async function signIn(event) {
       : await supabase.auth.signInWithPassword({ email, password: form.get('password') });
     state.loading = false;
     if (result.error) {
-      state.error = 'تعذر تسجيل الدخول. تحقق من بيانات الحساب أو الرمز وصلاحية الوصول.';
+      state.error = 'تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور أو الرمز.';
       renderLogin();
       return;
     }
@@ -97,14 +97,14 @@ async function signIn(event) {
     await loadDashboard();
   } catch {
     state.loading = false;
-    state.error = 'تعذر تسجيل الدخول. تحقق من الاتصال ثم أعد المحاولة.';
+    state.error = 'تعذر الاتصال. أعد المحاولة.';
     renderLogin();
   }
 }
 
 async function sendOtp(email) {
   if (!supabase || !email) {
-    state.error = 'أدخل بريد الحساب الموجود أولًا.';
+    state.error = 'أدخل البريد الإلكتروني.';
     renderLogin();
     return;
   }
@@ -115,7 +115,7 @@ async function sendOtp(email) {
     const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: new URL(import.meta.env.BASE_URL, window.location.origin).href } });
     state.loading = false;
     if (error) {
-      state.error = 'تعذر إرسال رابط الدخول لهذا الحساب. تحقق من البريد أو صلاحية الوصول.';
+      state.error = 'تعذر إرسال رابط الدخول. تحقق من البريد.';
       renderLogin();
       return;
     }
@@ -124,7 +124,7 @@ async function sendOtp(email) {
     document.querySelector('[name="token"]')?.focus();
   } catch {
     state.loading = false;
-    state.error = 'تعذر إرسال رابط الدخول. تحقق من الاتصال ثم أعد المحاولة.';
+    state.error = 'تعذر إرسال رابط الدخول. أعد المحاولة.';
     renderLogin();
   }
 }
@@ -222,15 +222,15 @@ async function loadDashboard() {
     state.loadingUserId = '';
     state.loadedUserId = '';
     state.error = error?.code === '42501' || error?.status === 403
-      ? 'هذا الحساب غير مصرح له بعرض بيانات لوحة التحصين.'
-      : 'تعذر تحميل البيانات كاملة. حدّث الصفحة أو تحقق من الاتصال والصلاحيات.';
+      ? 'لا يملك الحساب صلاحية عرض البيانات.'
+      : 'تعذر تحميل البيانات. أعد المحاولة.';
     renderDashboard();
   }
 }
 
 function renderLoading() {
   document.querySelector('#main-content').classList.remove('login-main');
-  document.querySelector('#main-content').innerHTML = '<section class="panel loading-card"><div class="spinner" aria-hidden="true"></div><p>جارٍ تحميل بيانات التقارير…</p></section>';
+  document.querySelector('#main-content').innerHTML = '<section class="panel loading-card"><div class="spinner" aria-hidden="true"></div><p>جارٍ التحميل…</p></section>';
 }
 
 function currentRows() {
@@ -270,8 +270,8 @@ function renderDashboard() {
   const knownStatuses = uniqueSorted(state.rows.map(row => row.status));
   const pendingReviewCount = state.rows.filter(row => row.status === 'needs_review').length;
   document.querySelector('#main-content').innerHTML = `
-    <div class="page-heading"><div><div class="eyebrow">ملخص البيانات · معامل التفريخ</div><h1>لوحة متابعة التحصين</h1><p class="muted">بيانات حقيقية حسب صلاحيات الحساب · تُحسب الطيور مرة واحدة لكل تقرير.</p></div><button id="export-csv" class="button outline">تصدير CSV</button></div>
-    <section class="filters panel" aria-label="مرشحات التقارير"><div class="filter-title"><div><h2>تصفية التقارير</h2><p>المرشحات تطبق على المؤشرات والمنتجات والعملاء والدفعات.</p></div><button id="clear-filters" class="button quiet">مسح المرشحات</button></div><div class="filter-grid">
+    <div class="page-heading"><div><h1>تقارير التحصين</h1></div><button id="export-csv" class="button outline">تصدير CSV</button></div>
+    <section class="filters panel" aria-label="مرشحات التقارير"><div class="filter-title"><div><h2>المرشحات</h2></div><button id="clear-filters" class="button quiet">مسح المرشحات</button></div><div class="filter-grid">
       <label>من تاريخ<input id="date-from" type="date" value="${escapeHtml(state.filters.dateFrom)}"></label><label>إلى تاريخ<input id="date-to" type="date" value="${escapeHtml(state.filters.dateTo)}"></label>
       <label>المنطقة التشغيلية<select id="region-filter"><option value="all">كل المناطق</option><option value="__unassigned__" ${regionValue === '__unassigned__' ? 'selected' : ''}>غير محددة</option>${regionItems}</select></label>
       <label>العميل / الكود<select id="customer-filter"><option value="">كل العملاء</option>${customerItems}</select></label>
@@ -279,12 +279,12 @@ function renderDashboard() {
       <fieldset class="status-filter"><legend>حالة التقرير</legend>${knownStatuses.map(status => `<label class="check-label"><input type="checkbox" name="status" value="${escapeHtml(status)}" ${state.filters.status.includes(status) ? 'checked' : ''}> ${escapeHtml(statusNames[status] || status)}</label>`).join('')}</fieldset>
     </div></section>
     ${state.error ? `<div class="alert error" role="alert">${escapeHtml(state.error)} <button id="retry" class="button quiet">إعادة المحاولة</button></div>` : ''}
-    <div class="coverage-line"><span>يعرض ${number(rows.length)} من ${number(state.total)} تقريرًا</span><span>بانتظار المراجعة: ${number(pendingReviewCount)}</span><span>المسجل فقط · ${number(state.sourceReportCount ?? state.total)} تقريرًا بالمصدر · ${number(state.excludedInvalid ?? 0)} مستبعد لغياب عدد الطيور</span><span>تاريخ البيانات المتاح: ${dateLabel(state.dateMin)} – ${dateLabel(state.dateMax)} · الفترة الأخيرة حتى ${dateLabel(state.dateMax)}</span><span>آخر تحديث: ${state.refreshedAt ? new Date(state.refreshedAt).toLocaleString('ar-EG') : '—'}</span></div>
-    <section class="metrics-grid" aria-label="المؤشرات"><article class="metric-card"><span>طيور فريدة ضمن التقارير</span><strong>${number(stats.birds)}</strong><small>التقرير يُحسب مرة واحدة مهما تعددت اللقاحات</small></article><article class="metric-card"><span>عدد التقارير / الدفعات</span><strong>${number(stats.batches)}</strong><small>وفق المرشحات المحددة</small></article><article class="metric-card"><span>عملاء نشطون</span><strong>${number(stats.customers)}</strong><small>كل سجل عميل مستقل بحسب كوده</small></article><article class="metric-card"><span>منتجات مسجلة</span><strong>${number(stats.productById.size)}</strong><small>تغطية المنتج قد تتداخل بين الدفعات</small></article></section>
-    <section class="panel products-panel"><div class="section-heading"><div><div class="eyebrow">تحليل المنتجات</div><h2>أداء اللقاحات والمنتجات</h2><p class="muted">تغطية الطيور حسب المنتج · النتائج ضمن التقارير المطابقة للمرشحات</p></div><label class="inline-select">المنتج المحدد<select id="product-detail"><option value="">اختر منتجًا</option>${productDetailItems}</select></label></div><div class="overlap-note"><b>تداخل تغطية المنتج:</b> قد يُسجل أكثر من منتج في التقرير نفسه. كل منتج يحتسب طيور التقرير مرة ضمن تغطيته، لذلك مجموع تغطيات المنتجات قد يتجاوز إجمالي الطيور الفريدة ولا يمثل حصة سوقية. كميات منتجات المنافسين غير معروضة.</div>${stats.competitorNames.size ? `<p class="competitor-context">أسماء منتجات منافسة مذكورة في التقارير: ${[...stats.competitorNames].map(escapeHtml).join('، ')}.</p>` : ''}<div class="products-grid"><div class="table-scroll"><table><thead><tr><th>المنتج</th><th>طيور مغطاة</th><th>تقارير</th><th>عملاء</th><th>أمبولات</th></tr></thead><tbody>${renderProductRows(stats.productById)}</tbody></table></div><div id="product-detail-panel" class="product-detail"><div class="empty-state">اختر منتجًا لعرض اتجاهه والعملاء والمناطق.</div></div></div></section>
-    <section class="charts-grid"><article class="panel"><div class="section-heading"><div><h2>اتجاه الطيور عبر الأشهر</h2><p class="muted">الطيور الفريدة في التقارير المطابقة للمرشحات</p></div></div><div id="overall-chart">${renderBirdChart(rows, 'overall')}</div></article><article class="panel"><h2>التوزيع التشغيلي للمناطق</h2><p class="muted">أعداد التقارير والطيور؛ المنطقة غير المحددة تظهر منفصلة.</p><div id="region-bars">${renderRegionBars(stats.regionByName)}</div></article></section>
-    <section class="panel customer-panel"><div class="section-heading"><div><div class="eyebrow">تحليل العملاء</div><h2>العملاء والدفعات</h2><p class="muted">أكواد العملاء مستقلة ولو تشابه الاسم. اختر عميلًا للاطلاع على نشاطه.</p></div><div class="customer-search"><label for="customer-search">بحث العملاء</label><input id="customer-search" type="search" value="${escapeHtml(state.search)}" placeholder="اسم العميل أو الكود"></div></div><div class="customer-layout"><aside id="customer-list" class="customer-list"></aside><div id="customer-profile" class="customer-profile"><div class="empty-state">اختر عميلًا من القائمة.</div></div></div></section>
-    <section class="panel reports-panel"><div class="section-heading"><div><h2>التقارير الأخيرة</h2><p class="muted">${number(rows.length)} تقرير مطابق · تعرض الصفحة ${number(state.pageSize)} تقريرًا</p></div><div class="pagination"><button id="previous-page" class="button quiet" ${state.page === 0 ? 'disabled' : ''}>السابق</button><span>صفحة ${state.page + 1} من ${Math.max(1, Math.ceil(rows.length / state.pageSize))}</span><button id="next-page" class="button quiet" ${(state.page + 1) * state.pageSize >= rows.length ? 'disabled' : ''}>التالي</button></div></div><div class="table-scroll"><table><thead><tr><th>التقرير</th><th>التاريخ</th><th>العميل / المنطقة</th><th>المفرخ</th><th>الطيور</th><th>المنتجات المسجلة</th><th>الحالة</th><th>تفاصيل</th></tr></thead><tbody>${renderReportRows(rows)}</tbody></table></div></section>`;
+    <div class="coverage-line"><span>${number(rows.length)} من ${number(state.total)} تقرير</span><span>للمراجعة: ${number(pendingReviewCount)}</span><span>إجمالي المصدر: ${number(state.sourceReportCount ?? state.total)} · دون عدد طيور: ${number(state.excludedInvalid ?? 0)}</span><span>الفترة: ${dateLabel(state.dateMin)} – ${dateLabel(state.dateMax)}</span><span>آخر تحديث: ${state.refreshedAt ? new Date(state.refreshedAt).toLocaleString('ar-EG') : '—'}</span></div>
+    <section class="metrics-grid" aria-label="المؤشرات"><article class="metric-card"><span>الطيور</span><strong>${number(stats.birds)}</strong><small>مرة لكل تقرير</small></article><article class="metric-card"><span>التقارير</span><strong>${number(stats.batches)}</strong></article><article class="metric-card"><span>العملاء</span><strong>${number(stats.customers)}</strong></article><article class="metric-card"><span>المنتجات</span><strong>${number(stats.productById.size)}</strong></article></section>
+    <section class="panel products-panel"><div class="section-heading"><div><h2>المنتجات</h2></div><label class="inline-select">المنتج<select id="product-detail"><option value="">اختر منتجًا</option>${productDetailItems}</select></label></div><div class="overlap-note"><b>تداخل المنتجات:</b> قد تضم الدفعة عدة منتجات؛ لا تُجمع أعداد الطيور بينها. تظهر منتجات المنافسين بالاسم فقط.</div>${stats.competitorNames.size ? `<p class="competitor-context">منتجات منافسة: ${[...stats.competitorNames].map(escapeHtml).join('، ')}.</p>` : ''}<div class="products-grid"><div class="table-scroll"><table><thead><tr><th>المنتج</th><th>طيور مغطاة</th><th>تقارير</th><th>عملاء</th><th>أمبولات</th></tr></thead><tbody>${renderProductRows(stats.productById)}</tbody></table></div><div id="product-detail-panel" class="product-detail"><div class="empty-state">اختر منتجًا للتفاصيل.</div></div></div></section>
+    <section class="charts-grid"><article class="panel"><div class="section-heading"><div><h2>الطيور حسب الشهر</h2></div></div><div id="overall-chart">${renderBirdChart(rows, 'overall')}</div></article><article class="panel"><h2>التقارير حسب المنطقة</h2><div id="region-bars">${renderRegionBars(stats.regionByName)}</div></article></section>
+    <section class="panel customer-panel"><div class="section-heading"><div><h2>العملاء</h2></div><div class="customer-search"><label for="customer-search">بحث</label><input id="customer-search" type="search" value="${escapeHtml(state.search)}" placeholder="اسم أو كود العميل"></div></div><div class="customer-layout"><aside id="customer-list" class="customer-list"></aside><div id="customer-profile" class="customer-profile"><div class="empty-state">اختر عميلًا.</div></div></div></section>
+    <section class="panel reports-panel"><div class="section-heading"><div><h2>التقارير الأخيرة</h2></div><div class="pagination"><button id="previous-page" class="button quiet" ${state.page === 0 ? 'disabled' : ''}>السابق</button><span>${state.page + 1} / ${Math.max(1, Math.ceil(rows.length / state.pageSize))}</span><button id="next-page" class="button quiet" ${(state.page + 1) * state.pageSize >= rows.length ? 'disabled' : ''}>التالي</button></div></div><div class="table-scroll"><table><thead><tr><th>التقرير</th><th>التاريخ</th><th>العميل / المنطقة</th><th>المفرخ</th><th>الطيور</th><th>المنتجات المسجلة</th><th>الحالة</th><th>تفاصيل</th></tr></thead><tbody>${renderReportRows(rows)}</tbody></table></div></section>`;
   bindDashboardEvents();
   renderCustomerAnalysis(rows);
   renderProductDetail(rows);
@@ -292,19 +292,19 @@ function renderDashboard() {
 
 function renderProductRows(products) {
   const sorted = [...products.values()].sort((a, b) => b.birds - a.birds || a.name.localeCompare(b.name, 'ar'));
-  if (!sorted.length) return '<tr><td colspan="5" class="empty-row">لا توجد منتجات في التقارير المطابقة.</td></tr>';
+  if (!sorted.length) return '<tr><td colspan="5" class="empty-row">لا توجد منتجات.</td></tr>';
   return sorted.map(product => `<tr><td><button class="text-action product-choice" data-product-id="${escapeHtml(product.id)}">${escapeHtml(product.name)}</button>${product.isCompetitor ? '<span class="small-tag">منافس</span>' : ''}</td><td>${number(product.birds)}</td><td>${number(product.batches)}</td><td>${number(product.customers.size)}</td><td>${product.isCompetitor ? '—' : ampouleSummary(product)}</td></tr>`).join('');
 }
 
 function renderRegionBars(regions) {
   const data = [...regions.values()].sort((a, b) => b.batches - a.batches);
-  if (!data.length) return '<div class="empty-state">لا توجد تقارير ضمن المرشحات.</div>';
+  if (!data.length) return '<div class="empty-state">لا توجد بيانات.</div>';
   const max = Math.max(...data.map(region => region.batches), 1);
   return data.map(region => `<div class="region-row"><span>${escapeHtml(region.name || 'منطقة غير محددة')}</span><div class="bar"><i style="width:${Math.max(4, region.batches / max * 100)}%"></i></div><b>${number(region.batches)} تقرير</b><small>${number(region.birds)} طائر</small></div>`).join('');
 }
 
 function renderBirdChart(rows, suffix = '') {
-  if (!rows.length) return '<div class="empty-state">لا توجد بيانات للرسم ضمن المرشحات.</div>';
+  if (!rows.length) return '<div class="empty-state">لا توجد بيانات.</div>';
   const monthly = new Map();
   for (const row of rows) {
     const key = monthKey(row.date);
@@ -312,7 +312,7 @@ function renderBirdChart(rows, suffix = '') {
     monthly.set(key, (monthly.get(key) || 0) + (Number(row.bird_count) || 0));
   }
   const points = [...monthly.entries()].sort(([a], [b]) => a.localeCompare(b));
-  if (!points.length) return '<div class="empty-state">لا تتوفر تواريخ للرسم.</div>';
+  if (!points.length) return '<div class="empty-state">لا توجد تواريخ.</div>';
   const max = Math.max(...points.map(([, value]) => value), 1);
   const tickEvery = Math.max(1, Math.ceil(points.length / 8));
   const coords = points.map(([, value], index) => [75 + index * (590 / Math.max(points.length - 1, 1)), 190 - value / max * 145]);
@@ -327,11 +327,11 @@ function renderProductDetail(rows) {
   const associated = rows.filter(row => row.products?.some(product => product.id === selected));
   const product = associated.flatMap(row => row.products).find(item => item.id === selected);
   if (!associated.length || !product) {
-    panel.innerHTML = '<div class="empty-state">لا توجد تقارير مطابقة لهذا المنتج في النطاق الحالي.</div>';
+    panel.innerHTML = '<div class="empty-state">لا توجد تقارير لهذا المنتج.</div>';
     return;
   }
   if (product.is_competitor) {
-    panel.innerHTML = `<div class="detail-title"><div><span class="eyebrow">اسم منتج منافس</span><h3>${escapeHtml(product.name)}</h3></div><button class="button quiet" id="clear-product-detail">مسح</button></div><p class="muted">يظهر الاسم فقط. لا تعرض اللوحة كميات أو تغطية أو عدد تقارير لمنتجات المنافسين.</p>`;
+    panel.innerHTML = `<div class="detail-title"><div><span class="eyebrow">منافس</span><h3>${escapeHtml(product.name)}</h3></div><button class="button quiet" id="clear-product-detail">مسح</button></div>`;
     document.querySelector('#clear-product-detail')?.addEventListener('click', () => { state.selectedProductId = ''; renderDashboard(); });
     return;
   }
@@ -356,7 +356,7 @@ function renderProductDetail(rows) {
   });
   const topCustomers = [...customers.values()].sort((a, b) => b.birds - a.birds).slice(0, 5);
   const regionRows = [...regions.values()].sort((a, b) => b.birds - a.birds);
-  panel.innerHTML = `<div class="detail-title"><div><span class="eyebrow">تفاصيل المنتج</span><h3>${escapeHtml(product.name)}</h3></div><button class="button quiet" id="clear-product-detail">مسح</button></div><div class="detail-kpis"><div><small>طيور ضمن المنتج</small><b>${number(productBirds)}</b></div><div><small>تقارير</small><b>${number(associated.length)}</b></div><div><small>عملاء بأكواد مستقلة</small><b>${number(customers.size)}</b></div></div><p class="muted product-context">تُحسب طيور التقرير مرة واحدة ضمن هذا المنتج. تغطيات المنتجات قد تتداخل.</p><div class="detail-columns"><div><h4>اتجاه الطيور</h4>${renderBirdChart(uniqueProductRows, 'product')}</div><div><h4>العملاء والمناطق</h4><div class="mini-list">${topCustomers.map(row => `<div><span>${escapeHtml(row.label)}</span><b>${number(row.birds)} طائر · ${row.batches} تقارير</b></div>`).join('') || '<p>لا يوجد عملاء.</p>'}</div><div class="mini-list region-list">${regionRows.map(row => `<div><span>${escapeHtml(row.label)}</span><b>${number(row.birds)} طائر · ${row.batches}</b></div>`).join('')}</div></div></div>`;
+  panel.innerHTML = `<div class="detail-title"><div><h3>${escapeHtml(product.name)}</h3></div><button class="button quiet" id="clear-product-detail">مسح</button></div><div class="detail-kpis"><div><small>الطيور</small><b>${number(productBirds)}</b></div><div><small>التقارير</small><b>${number(associated.length)}</b></div><div><small>العملاء</small><b>${number(customers.size)}</b></div></div><div class="detail-columns"><div><h4>الطيور حسب الشهر</h4>${renderBirdChart(uniqueProductRows, 'product')}</div><div><h4>العملاء والمناطق</h4><div class="mini-list">${topCustomers.map(row => `<div><span>${escapeHtml(row.label)}</span><b>${number(row.birds)} طائر · ${row.batches} تقارير</b></div>`).join('') || '<p>لا يوجد عملاء.</p>'}</div><div class="mini-list region-list">${regionRows.map(row => `<div><span>${escapeHtml(row.label)}</span><b>${number(row.birds)} طائر · ${row.batches}</b></div>`).join('')}</div></div></div>`;
   document.querySelector('#clear-product-detail')?.addEventListener('click', () => { state.selectedProductId = ''; renderDashboard(); });
 }
 
@@ -376,11 +376,11 @@ function renderCustomerAnalysis(rows) {
   const entries = [...grouped.values()].map(entry => ({ ...entry, birds: entry.rows.reduce((sum, row) => sum + (Number(row.bird_count) || 0), 0), latest: entry.rows.reduce((latest, row) => !latest || row.date > latest ? row.date : latest, null) })).sort((a, b) => b.birds - a.birds);
   const searched = entries.filter(entry => `${entry.name} ${entry.code} ${[...entry.regions].join(' ')}`.toLocaleLowerCase().includes(state.search.toLocaleLowerCase()));
   if (!searched.some(entry => entry.code === state.selectedCustomerCode)) state.selectedCustomerCode = searched[0]?.code || '';
-  list.innerHTML = searched.length ? searched.map(entry => `<button class="customer-result ${entry.code === state.selectedCustomerCode ? 'active' : ''}" data-customer-code="${escapeHtml(entry.code)}"><strong>${escapeHtml(entry.name)}</strong><small>${escapeHtml([...entry.regions].join('، ') || 'منطقة غير محددة')}</small><span>${number(entry.birds)} طائر · ${entry.rows.length} تقارير</span></button>`).join('') : '<div class="empty-state">لا يوجد عملاء يطابقون البحث.</div>';
+  list.innerHTML = searched.length ? searched.map(entry => `<button class="customer-result ${entry.code === state.selectedCustomerCode ? 'active' : ''}" data-customer-code="${escapeHtml(entry.code)}"><strong>${escapeHtml(entry.name)}</strong><small>${escapeHtml([...entry.regions].join('، ') || 'منطقة غير محددة')}</small><span>${number(entry.birds)} طائر · ${entry.rows.length} تقرير</span></button>`).join('') : '<div class="empty-state">لا توجد نتائج.</div>';
   list.querySelectorAll('[data-customer-code]').forEach(button => button.addEventListener('click', () => { state.selectedCustomerCode = button.dataset.customerCode; renderCustomerAnalysis(rows); }));
   const selected = entries.find(entry => entry.code === state.selectedCustomerCode);
   if (!selected) {
-    profile.innerHTML = '<div class="empty-state">لا توجد بيانات عميل ضمن المرشحات.</div>';
+    profile.innerHTML = '<div class="empty-state">لا توجد بيانات.</div>';
     return;
   }
   const customerRows = [...selected.rows].sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.id).localeCompare(String(b.id)));
@@ -398,13 +398,13 @@ function renderCustomerAnalysis(rows) {
     item.batches += 1;
     monthValues.set(key, item);
   });
-  profile.innerHTML = `<div class="profile-head"><div><span class="eyebrow">ملف العميل</span><h3>${escapeHtml(selected.name)}</h3><p>كود العميل: ${escapeHtml(selected.code)} · ${escapeHtml([...selected.regions].join('، ') || 'منطقة غير محددة')}</p></div><div class="segmented" role="group" aria-label="مقياس الاتجاه الشهري"><button data-customer-metric="birds" aria-pressed="${state.customerMetric === 'birds'}">الطيور</button><button data-customer-metric="batches" aria-pressed="${state.customerMetric === 'batches'}">التقارير</button></div></div><div class="customer-kpis"><div><small>طيور فريدة ضمن التقارير</small><b>${number(selected.birds)}</b></div><div><small>عدد التقارير</small><b>${number(customerRows.length)}</b></div><div><small>آخر تقرير</small><b>${dateLabel(latestDate)}</b></div><div><small>أشهر بها نشاط</small><b>${number(activeMonths)}</b></div></div><div class="customer-month-chart"><div class="section-heading"><h4>النشاط عبر الأشهر</h4><span>${state.customerMetric === 'birds' ? 'عدد الطيور' : 'عدد التقارير'}</span></div>${renderCustomerChart(monthValues, state.customerMetric)}</div><div class="customer-detail-grid"><div><h4>المنتجات المسجلة</h4><p class="muted">طيور المنتج تتداخل إذا احتوت الدفعة منتجات متعددة. المنافسون يظهرون بالاسم فقط.</p><div class="table-scroll"><table><thead><tr><th>المنتج</th><th>طيور المنتج</th><th>تقارير</th><th>أمبولات</th></tr></thead><tbody>${products.map(product => `<tr><td>${escapeHtml(product.name)}</td><td>${number(product.birds)}</td><td>${number(product.reports)}</td><td>${ampouleSummary(product)}</td></tr>`).join('') || '<tr><td colspan="4">لا توجد منتجات.</td></tr>'}</tbody></table></div>${competitorNames.size ? `<p class="muted">منتجات منافسة مسجلة بالاسم فقط: ${[...competitorNames].map(escapeHtml).join('، ')}.</p>` : ''}</div><div><h4>دفعات العميل</h4><p class="muted">الأحدث أولًا · تُعرض تفاصيل السجل كما وردت في البيانات.</p><div class="table-scroll"><table><thead><tr><th>التاريخ</th><th>الطيور</th><th>التفاصيل</th></tr></thead><tbody>${[...customerRows].reverse().map(row => `<tr><td>${dateLabel(row.date)}</td><td>${number(row.bird_count)}</td><td><details><summary>تفاصيل التقرير</summary><div class="batch-expansion"><p>المرجع: ${escapeHtml(row.reference || row.printed_report_number || '—')}</p><p>المفرخ: ${escapeHtml(row.hatchery || '—')}</p><p>المنتجات: ${(row.products || []).map(product => escapeHtml(product.name) + (product.is_competitor ? '' : ` · ${product.ampoule_count == null ? 'الكمية غير مسجلة' : `${number(product.ampoule_count)} أمبولة`}${product.batch_lot ? ` · ${escapeHtml(product.batch_lot)}` : ''}`)).join('، ') || '—'}</p><p>الفترة: ${escapeHtml(row.start_time || '—')} – ${escapeHtml(row.end_time || '—')}</p></div></details></td></tr>`).join('')}</tbody></table></div></div></div>`;
+  profile.innerHTML = `<div class="profile-head"><div><h3>${escapeHtml(selected.name)}</h3><p>الكود: ${escapeHtml(selected.code)} · ${escapeHtml([...selected.regions].join('، ') || 'منطقة غير محددة')}</p></div><div class="segmented" role="group" aria-label="المقياس الشهري"><button data-customer-metric="birds" aria-pressed="${state.customerMetric === 'birds'}">الطيور</button><button data-customer-metric="batches" aria-pressed="${state.customerMetric === 'batches'}">التقارير</button></div></div><div class="customer-kpis"><div><small>الطيور</small><b>${number(selected.birds)}</b></div><div><small>التقارير</small><b>${number(customerRows.length)}</b></div><div><small>آخر تقرير</small><b>${dateLabel(latestDate)}</b></div><div><small>أشهر النشاط</small><b>${number(activeMonths)}</b></div></div><div class="customer-month-chart"><div class="section-heading"><h4>النشاط الشهري</h4><span>${state.customerMetric === 'birds' ? 'طيور' : 'تقارير'}</span></div>${renderCustomerChart(monthValues, state.customerMetric)}</div><div class="customer-detail-grid"><div><h4>المنتجات</h4><div class="table-scroll"><table><thead><tr><th>المنتج</th><th>طيور المنتج</th><th>تقارير</th><th>أمبولات</th></tr></thead><tbody>${products.map(product => `<tr><td>${escapeHtml(product.name)}</td><td>${number(product.birds)}</td><td>${number(product.reports)}</td><td>${ampouleSummary(product)}</td></tr>`).join('') || '<tr><td colspan="4">لا توجد منتجات.</td></tr>'}</tbody></table></div>${competitorNames.size ? `<p class="muted">منتجات منافسة: ${[...competitorNames].map(escapeHtml).join('، ')}.</p>` : ''}</div><div><h4>الدفعات</h4><div class="table-scroll"><table><thead><tr><th>التاريخ</th><th>الطيور</th><th>التفاصيل</th></tr></thead><tbody>${[...customerRows].reverse().map(row => `<tr><td>${dateLabel(row.date)}</td><td>${number(row.bird_count)}</td><td><details><summary>التفاصيل</summary><div class="batch-expansion"><p>المرجع: ${escapeHtml(row.reference || row.printed_report_number || '—')}</p><p>المفرخ: ${escapeHtml(row.hatchery || '—')}</p><p>المنتجات: ${(row.products || []).map(product => escapeHtml(product.name) + (product.is_competitor ? '' : ` · ${product.ampoule_count == null ? 'الكمية غير مسجلة' : `${number(product.ampoule_count)} أمبولة`}${product.batch_lot ? ` · ${escapeHtml(product.batch_lot)}` : ''}`)).join('، ') || '—'}</p><p>الوقت: ${escapeHtml(row.start_time || '—')} – ${escapeHtml(row.end_time || '—')}</p></div></details></td></tr>`).join('')}</tbody></table></div></div></div>`;
   profile.querySelectorAll('[data-customer-metric]').forEach(button => button.addEventListener('click', () => { state.customerMetric = button.dataset.customerMetric; renderCustomerAnalysis(rows); }));
 }
 
 function renderCustomerChart(monthValues, metric) {
   const keys = [...monthValues.keys()].sort();
-  if (!keys.length) return '<div class="empty-state">لا توجد تواريخ صالحة للرسم.</div>';
+  if (!keys.length) return '<div class="empty-state">لا توجد تواريخ.</div>';
   const values = keys.map(key => monthValues.get(key)[metric]);
   const max = Math.max(...values, 1);
   const coords = values.map((value, index) => [70 + index * (600 / Math.max(values.length - 1, 1)), 140 - value / max * 100]);
@@ -414,7 +414,7 @@ function renderCustomerChart(monthValues, metric) {
 
 function renderReportRows(rows) {
   const pageRows = [...rows].sort((a,b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.id).localeCompare(String(a.id))).slice(state.page * state.pageSize, (state.page + 1) * state.pageSize);
-  if (!pageRows.length) return '<tr><td colspan="8" class="empty-row">لا توجد تقارير مطابقة.</td></tr>';
+  if (!pageRows.length) return '<tr><td colspan="8" class="empty-row">لا توجد تقارير.</td></tr>';
   const statusLabels = { accepted: 'معتمد', needs_review: 'بحاجة للمراجعة', rejected: 'مستبعد' };
   return pageRows.map(row => `<tr><td>${escapeHtml(row.printed_report_number || row.reference || row.id)}</td><td>${dateLabel(row.date)}</td><td>${escapeHtml(customerLabel(row))}</td><td>${escapeHtml(row.hatchery || '—')}</td><td>${number(row.bird_count)}</td><td>${(row.products || []).map(product => escapeHtml(product.name || 'منتج غير محدد')).join('، ') || '—'}</td><td><span class="status ${row.status === 'accepted' ? 'accepted' : 'review'}">${escapeHtml(statusLabels[row.status] || row.status || '—')}</span></td><td><button class="button small" data-open-report="${escapeHtml(row.id)}">فتح</button></td></tr>`).join('');
 }
@@ -485,17 +485,17 @@ async function openReport(id) {
   sourceRequestId += 1;
   const products = getReportProducts(row);
   const duration = durationMinutes(row.start_time, row.end_time);
-  content.innerHTML = `<div class="dialog-head"><div><span class="eyebrow">تفاصيل التقرير</span><h2>${escapeHtml(row.printed_report_number || row.reference || row.id)}</h2></div><button class="icon-button" id="close-dialog" aria-label="إغلاق">×</button></div><div class="dialog-facts"><div><small>العميل</small><b>${escapeHtml(customerLabel(row))}</b></div><div><small>التاريخ</small><b>${dateLabel(row.date)}</b></div><div><small>المفرخ</small><b>${escapeHtml(row.hatchery || '—')}</b></div><div><small>الطيور</small><b>${number(row.bird_count)}</b></div><div><small>المنطقة وحالتها</small><b>${escapeHtml(row.region || 'غير محددة')} · ${escapeHtml(({confirmed:'مؤكدة',proposed:'مستندة للتاريخ',unresolved:'تحتاج تحديد'})[row.region_status] || '—')}</b></div><div><small>المندوب / المهندس</small><b>${escapeHtml([row.sales_rep, row.engineer].filter(Boolean).join(' · ') || '—')}</b></div><div><small>الوقت المسجل</small><b>${escapeHtml(row.start_time || '—')} – ${escapeHtml(row.end_time || '—')}</b></div><div><small>المدة</small><b>${duration == null ? 'غير متاحة' : `${duration} دقيقة`}</b></div></div><section class="dialog-products"><h3>اللقاحات والمنتجات</h3><div>${products.map(product => `<div class="dialog-product"><span>${escapeHtml(product.name)}${product.competitor ? ' · منافس' : ''}</span><span>${product.competitor ? '' : product.ampoules == null ? 'الكمية غير مسجلة' : `${number(product.ampoules)} أمبولة`}</span><small>${product.competitor ? '' : escapeHtml(product.batchLot || 'رقم التشغيلة غير متاح')}</small></div>`).join('') || '<p>لا توجد منتجات مسجلة.</p>'}</div></section><section id="source-section" class="source-section"></section>`;
+  content.innerHTML = `<div class="dialog-head"><div><h2>${escapeHtml(row.printed_report_number || row.reference || row.id)}</h2></div><button class="icon-button" id="close-dialog" aria-label="إغلاق">×</button></div><div class="dialog-facts"><div><small>العميل</small><b>${escapeHtml(customerLabel(row))}</b></div><div><small>التاريخ</small><b>${dateLabel(row.date)}</b></div><div><small>المفرخ</small><b>${escapeHtml(row.hatchery || '—')}</b></div><div><small>الطيور</small><b>${number(row.bird_count)}</b></div><div><small>المنطقة / الحالة</small><b>${escapeHtml(row.region || 'غير محددة')} · ${escapeHtml(({confirmed:'مؤكدة',proposed:'مستندة للتاريخ',unresolved:'تحتاج تحديد'})[row.region_status] || '—')}</b></div><div><small>المندوب / المهندس</small><b>${escapeHtml([row.sales_rep, row.engineer].filter(Boolean).join(' · ') || '—')}</b></div><div><small>الوقت</small><b>${escapeHtml(row.start_time || '—')} – ${escapeHtml(row.end_time || '—')}</b></div><div><small>المدة</small><b>${duration == null ? '—' : `${duration} دقيقة`}</b></div></div><section class="dialog-products"><h3>المنتجات</h3><div>${products.map(product => `<div class="dialog-product"><span>${escapeHtml(product.name)}${product.competitor ? ' · منافس' : ''}</span><span>${product.competitor ? '' : product.ampoules == null ? 'عدد الأمبولات غير مسجل' : `${number(product.ampoules)} أمبولة`}</span><small>${product.competitor ? '' : escapeHtml(product.batchLot || 'التشغيلة —')}</small></div>`).join('') || '<p>لا توجد منتجات.</p>'}</div></section><section id="source-section" class="source-section"></section>`;
   document.querySelector('#close-dialog').addEventListener('click', () => dialog.close());
   dialog.showModal();
   const source = document.querySelector('#source-section');
   if (row.source_kind === 'excel') {
-    source.innerHTML = '<p class="muted">هذا السجل مستورد من Excel؛ لا يتوفر ملف أصلي للمعاينة في التخزين.</p>';
+    source.innerHTML = '<p class="muted">لا يتوفر ملف أصلي لسجلات Excel.</p>';
   } else if (row.source_storage_path) {
-    source.innerHTML = '<button id="open-source" class="button outline">فتح الملف الأصلي (رابط آمن لمدة دقيقة)</button><div id="source-preview"></div>';
+    source.innerHTML = '<button id="open-source" class="button outline">فتح الملف الأصلي</button><div id="source-preview"></div>';
     document.querySelector('#open-source').addEventListener('click', () => createSourceUrl(row.source_storage_path, row.id));
   } else {
-    source.innerHTML = '<p class="muted">لا يتوفر ملف أصلي لهذا التقرير.</p>';
+    source.innerHTML = '<p class="muted">لا يتوفر ملف أصلي.</p>';
   }
 }
 
@@ -514,18 +514,18 @@ async function createSourceUrl(path, reportId) {
     const { data, error } = await supabase.storage.from('hatchery-reports').createSignedUrl(path, 60);
     if (!stillCurrent()) return;
     if (error || !data?.signedUrl) {
-      preview.innerHTML = '<p class="alert error">تعذر فتح الملف الأصلي ضمن صلاحيات هذا الحساب.</p>';
+      preview.innerHTML = '<p class="alert error">تعذر فتح الملف.</p>';
       return;
     }
     if (/\.(png|jpe?g|webp|gif)$/i.test(path)) preview.innerHTML = `<img class="source-image" src="${escapeHtml(data.signedUrl)}" alt="الملف الأصلي للتقرير">`;
     else preview.innerHTML = `<a class="button outline" href="${escapeHtml(data.signedUrl)}" target="_blank" rel="noopener noreferrer">عرض / تنزيل الملف</a>`;
   } catch {
-    if (stillCurrent()) preview.innerHTML = '<p class="alert error">تعذر فتح الملف الأصلي ضمن صلاحيات هذا الحساب.</p>';
+    if (stillCurrent()) preview.innerHTML = '<p class="alert error">تعذر فتح الملف.</p>';
   }
 }
 
 function renderLoginConfigError() {
-  state.error = 'أعد تحميل الصفحة بعد ضبط بيانات الاتصال.';
+  state.error = 'تعذر الاتصال بالخدمة.';
   renderLogin();
 }
 
