@@ -1,5 +1,8 @@
 export const isKnownCustomer = row => Boolean(row.customer_known !== false && row.customer_code && !String(row.customer_code).startsWith('unknown:') && row.customer !== 'غير محدد');
 
+// Regional suffixes belong to reviewed database identities, not presentation.
+export const customerLabel = row => isKnownCustomer(row) ? String(row.customer).trim() : 'عميل غير محدد';
+
 export function filterRows(rows, filters = {}) {
   const statuses = Array.isArray(filters.status) ? new Set(filters.status) : null;
   return rows.filter(row => {

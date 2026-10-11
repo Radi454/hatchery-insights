@@ -1,6 +1,6 @@
 import './styles.css';
 import { supabase, supabaseConfigured, supabaseConfigError } from './supabase.js';
-import { aggregateDashboard, durationMinutes, filterRows, getReportProducts, isKnownCustomer } from './dashboard-data.js';
+import { aggregateDashboard, customerLabel, durationMinutes, filterRows, getReportProducts, isKnownCustomer } from './dashboard-data.js';
 
 const app = document.querySelector('#app');
 const state = {
@@ -36,7 +36,6 @@ const birds = value => `${number(value)} طائر`;
 const dateLabel = value => value ? new Intl.DateTimeFormat('ar-EG', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`)) : '—';
 const monthLabel = value => value ? new Intl.DateTimeFormat('ar-EG', { year: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${value}-01T00:00:00Z`)) : '—';
 const customerIdentity = row => row.customer_code || `unassigned:${row.id}`;
-const customerLabel = row => { const name = isKnownCustomer(row) ? String(row.customer).trim() : 'عميل غير محدد'; const region = row.region ? String(row.region).trim() : null; if (!region) return `${name} (منطقة غير محددة)`; return name.endsWith(`(${region})`) ? name : `${name} (${region})`; };
 const monthKey = date => date ? String(date).slice(0, 7) : '';
 
 function renderShell() {

@@ -67,3 +67,12 @@ test('two separate report IDs remain separate batches on the same date', () => {
   assert.equal(result.batches, 2);
   assert.equal(result.birds, 2000);
 });
+
+test('customer labels preserve saved single and regional identities without adding suffixes', async () => {
+  const { customerLabel } = await import('../src/dashboard-data.js');
+  const known = { customer_known: true, customer_code: 'single', customer: 'Single customer', region: 'Monofia' };
+  assert.equal(customerLabel(known), 'Single customer');
+  assert.equal(customerLabel({ ...known, customer_code: 'split:East', customer: 'Split customer (East)', region: 'East' }), 'Split customer (East)');
+  assert.equal(customerLabel({ ...known, region: null }), 'Single customer');
+  assert.equal(customerLabel({ customer_known: false, customer_code: 'unknown:1', customer: 'غير محدد' }), 'عميل غير محدد');
+});
