@@ -28,6 +28,21 @@ test('region, customer, product and status filters compose', () => {
   assert.equal(filterRows(rows, { status: ['needs_review'] }).length, 1);
 });
 
+test('product slicers use OR within each group and AND across groups', () => {
+  const slicerRows = [
+    { id: 'both-a', status: 'accepted', products: [{ id: 'own-a', is_competitor: false }, { id: 'comp-x', is_competitor: true }] },
+    { id: 'both-b', status: 'accepted', products: [{ id: 'own-b', is_competitor: false }, { id: 'comp-y', is_competitor: true }] },
+    { id: 'own-only', status: 'accepted', products: [{ id: 'own-a', is_competitor: false }] },
+    { id: 'competitor-only', status: 'accepted', products: [{ id: 'comp-x', is_competitor: true }] },
+  ];
+
+  assert.deepEqual(filterRows(slicerRows, { productIds: ['own-a', 'own-b'] }).map(row => row.id), ['both-a', 'both-b', 'own-only']);
+  assert.deepEqual(filterRows(slicerRows, { competitorProductIds: ['comp-x', 'comp-y'] }).map(row => row.id), ['both-a', 'both-b', 'competitor-only']);
+  assert.deepEqual(filterRows(slicerRows, { productIds: ['own-a', 'own-b'], competitorProductIds: ['comp-x', 'comp-y'] }).map(row => row.id), ['both-a', 'both-b']);
+  assert.deepEqual(filterRows(slicerRows, { productIds: ['own-a'], competitorProductIds: ['comp-y'] }), []);
+  assert.deepEqual(filterRows(slicerRows, { productIds: [], competitorProductIds: [] }).map(row => row.id), slicerRows.map(row => row.id));
+});
+
 test('date filters include selected boundaries', () => {
   const filtered = filterRows(rows, { status: ['accepted'], dateFrom: '2026-09-14', dateTo: '2026-09-14' });
   assert.deepEqual(filtered.map(row => row.id), ['r2']);

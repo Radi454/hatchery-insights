@@ -14,7 +14,10 @@ export function filterRows(rows, filters = {}) {
       if (unassigned ? row.region != null : row.region !== filters.region) return false;
     }
     if (filters.customerCode && row.customer_code !== filters.customerCode) return false;
-    if (filters.productId && !row.products?.some(product => product.id === filters.productId)) return false;
+    const ownProductIds = filters.productIds ?? (filters.productId ? [filters.productId] : []);
+    const competitorProductIds = filters.competitorProductIds ?? (filters.competitorProductId ? [filters.competitorProductId] : []);
+    if (ownProductIds.length && !row.products?.some(product => ownProductIds.includes(product.id) && !product.is_competitor)) return false;
+    if (competitorProductIds.length && !row.products?.some(product => competitorProductIds.includes(product.id) && product.is_competitor)) return false;
     return true;
   });
 }

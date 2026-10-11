@@ -24,7 +24,8 @@ const state = {
   selectedCustomerCode: '',
   customerMetric: 'birds',
   search: '',
-  filters: { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productId: '' },
+  filters: { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [] },
+  competitorSearch: '',
 };
 let requestId = 0;
 let sourceRequestId = 0;
@@ -160,7 +161,8 @@ async function signOut() {
   state.page = 0;
   state.search = '';
   state.customerMetric = 'birds';
-  state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productId: '' };
+  state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [] };
+  state.competitorSearch = '';
   state.selectedProductId = '';
   state.selectedCustomerCode = '';
   renderLogin();
@@ -251,8 +253,21 @@ function filterOptions(rows) {
     if (!customerRows.has(key)) customerRows.set(key, row);
   }
   const products = new Map();
-  rows.forEach(row => (row.products || []).forEach(product => { if (product.id && product.name) products.set(product.id, product.name); }));
-  return { regions, customers: [...customerRows.entries()].sort((a, b) => customerLabel(a[1]).localeCompare(customerLabel(b[1]), 'ar')), products: [...products.entries()].sort((a, b) => a[1].localeCompare(b[1], 'ar')) };
+  const ownProducts = new Map();
+  const competitorProducts = new Map();
+  rows.forEach(row => (row.products || []).forEach(product => {
+    if (!product.id || !product.name) return;
+    products.set(product.id, product.name);
+    (product.is_competitor ? competitorProducts : ownProducts).set(product.id, product.name);
+  }));
+  const sortProducts = map => [...map.entries()].sort((a, b) => a[1].localeCompare(b[1], 'ar'));
+  return {
+    regions,
+    customers: [...customerRows.entries()].sort((a, b) => customerLabel(a[1]).localeCompare(customerLabel(b[1]), 'ar')),
+    products: sortProducts(products),
+    ownProducts: sortProducts(ownProducts),
+    competitorProducts: sortProducts(competitorProducts),
+  };
 }
 
 function renderDashboard() {
@@ -265,7 +280,9 @@ function renderDashboard() {
   const productDetailItems = options.products.map(([id, name]) => `<option value="${escapeHtml(id)}" ${state.selectedProductId === id ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
   const regionItems = options.regions.map(region => `<option value="${escapeHtml(region)}" ${regionValue === region ? 'selected' : ''}>${escapeHtml(region)}</option>`).join('');
   const customerItems = options.customers.map(([code, row]) => `<option value="${escapeHtml(code)}" ${state.filters.customerCode === code ? 'selected' : ''}>${escapeHtml(customerLabel(row))}</option>`).join('');
-  const productItems = options.products.map(([id, name]) => `<option value="${escapeHtml(id)}" ${state.filters.productId === id ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
+  const productSlicers = renderProductSlicer('productIds', 'منتجاتنا', options.ownProducts);
+  const filteredCompetitors = options.competitorProducts.filter(([, name]) => name.toLocaleLowerCase().includes(state.competitorSearch.toLocaleLowerCase()));
+  const competitorProductSlicers = renderProductSlicer('competitorProductIds', 'منتجات المنافسين', filteredCompetitors, true);
   const statusNames = { accepted: 'معتمد', needs_review: 'بحاجة للمراجعة', rejected: 'مستبعد' };
   const knownStatuses = uniqueSorted(state.rows.map(row => row.status));
   const pendingReviewCount = state.rows.filter(row => row.status === 'needs_review').length;
@@ -275,13 +292,13 @@ function renderDashboard() {
       <label>من تاريخ<input id="date-from" type="date" value="${escapeHtml(state.filters.dateFrom)}"></label><label>إلى تاريخ<input id="date-to" type="date" value="${escapeHtml(state.filters.dateTo)}"></label>
       <label>المنطقة التشغيلية<select id="region-filter"><option value="all">كل المناطق</option><option value="__unassigned__" ${regionValue === '__unassigned__' ? 'selected' : ''}>غير محددة</option>${regionItems}</select></label>
       <label>العميل / الكود<select id="customer-filter"><option value="">كل العملاء</option>${customerItems}</select></label>
-      <label>المنتج<select id="product-filter"><option value="">كل المنتجات</option>${productItems}</select></label>
+      <div class="product-slicers">${productSlicers}${competitorProductSlicers}</div>
       <fieldset class="status-filter"><legend>حالة التقرير</legend>${knownStatuses.map(status => `<label class="check-label"><input type="checkbox" name="status" value="${escapeHtml(status)}" ${state.filters.status.includes(status) ? 'checked' : ''}> ${escapeHtml(statusNames[status] || status)}</label>`).join('')}</fieldset>
     </div></section>
     ${state.error ? `<div class="alert error" role="alert">${escapeHtml(state.error)} <button id="retry" class="button quiet">إعادة المحاولة</button></div>` : ''}
     <div class="coverage-line"><span>${number(rows.length)} من ${number(state.total)} تقرير</span><span>للمراجعة: ${number(pendingReviewCount)}</span><span>إجمالي المصدر: ${number(state.sourceReportCount ?? state.total)} · دون عدد طيور: ${number(state.excludedInvalid ?? 0)}</span><span>الفترة: ${dateLabel(state.dateMin)} – ${dateLabel(state.dateMax)}</span><span>آخر تحديث: ${state.refreshedAt ? new Date(state.refreshedAt).toLocaleString('ar-EG') : '—'}</span></div>
     <section class="metrics-grid" aria-label="المؤشرات"><article class="metric-card"><span>الطيور</span><strong>${number(stats.birds)}</strong><small>مرة لكل تقرير</small></article><article class="metric-card"><span>التقارير</span><strong>${number(stats.batches)}</strong></article><article class="metric-card"><span>العملاء</span><strong>${number(stats.customers)}</strong></article><article class="metric-card"><span>المنتجات</span><strong>${number(stats.productById.size)}</strong></article></section>
-    <section class="panel products-panel"><div class="section-heading"><div><h2>المنتجات</h2></div><label class="inline-select">المنتج<select id="product-detail"><option value="">اختر منتجًا</option>${productDetailItems}</select></label></div><div class="overlap-note"><b>تداخل المنتجات:</b> قد تضم الدفعة عدة منتجات؛ لا تُجمع أعداد الطيور بينها. تظهر منتجات المنافسين بالاسم فقط.</div>${stats.competitorNames.size ? `<p class="competitor-context">منتجات منافسة: ${[...stats.competitorNames].map(escapeHtml).join('، ')}.</p>` : ''}<div class="products-grid"><div class="table-scroll"><table><thead><tr><th>المنتج</th><th>طيور مغطاة</th><th>تقارير</th><th>عملاء</th><th>أمبولات</th></tr></thead><tbody>${renderProductRows(stats.productById)}</tbody></table></div><div id="product-detail-panel" class="product-detail"><div class="empty-state">اختر منتجًا للتفاصيل.</div></div></div></section>
+    <section class="panel products-panel"><div class="section-heading"><div><h2>المنتجات</h2></div><label class="inline-select">المنتج<select id="product-detail"><option value="">اختر منتجًا</option>${productDetailItems}</select></label></div><div class="overlap-note"><b>تداخل المنتجات:</b> قد تضم الدفعة عدة منتجات؛ لا تُجمع أعداد الطيور بينها. تظهر منتجات المنافسين بالاسم فقط.</div><div class="products-grid"><div class="table-scroll"><table><thead><tr><th>المنتج</th><th>طيور مغطاة</th><th>تقارير</th><th>عملاء</th><th>أمبولات</th></tr></thead><tbody>${renderProductRows(stats.productById)}</tbody></table></div><div id="product-detail-panel" class="product-detail"><div class="empty-state">اختر منتجًا للتفاصيل.</div></div></div></section>
     <section class="charts-grid"><article class="panel"><div class="section-heading"><div><h2>الطيور حسب الشهر</h2></div></div><div id="overall-chart">${renderBirdChart(rows, 'overall')}</div></article><article class="panel"><h2>التقارير حسب المنطقة</h2><div id="region-bars">${renderRegionBars(stats.regionByName)}</div></article></section>
     <section class="panel customer-panel"><div class="section-heading"><div><h2>العملاء</h2></div><div class="customer-search"><label for="customer-search">بحث</label><input id="customer-search" type="search" value="${escapeHtml(state.search)}" placeholder="اسم أو كود العميل"></div></div><div class="customer-layout"><aside id="customer-list" class="customer-list"></aside><div id="customer-profile" class="customer-profile"><div class="empty-state">اختر عميلًا.</div></div></div></section>
     <section class="panel reports-panel"><div class="section-heading"><div><h2>التقارير الأخيرة</h2></div><div class="pagination"><button id="previous-page" class="button quiet" ${state.page === 0 ? 'disabled' : ''}>السابق</button><span>${state.page + 1} / ${Math.max(1, Math.ceil(rows.length / state.pageSize))}</span><button id="next-page" class="button quiet" ${(state.page + 1) * state.pageSize >= rows.length ? 'disabled' : ''}>التالي</button></div></div><div class="table-scroll"><table><thead><tr><th>التقرير</th><th>التاريخ</th><th>العميل / المنطقة</th><th>المفرخ</th><th>الطيور</th><th>المنتجات المسجلة</th><th>الحالة</th><th>تفاصيل</th></tr></thead><tbody>${renderReportRows(rows)}</tbody></table></div></section>`;
@@ -294,6 +311,13 @@ function renderProductRows(products) {
   const sorted = [...products.values()].sort((a, b) => b.birds - a.birds || a.name.localeCompare(b.name, 'ar'));
   if (!sorted.length) return '<tr><td colspan="5" class="empty-row">لا توجد منتجات.</td></tr>';
   return sorted.map(product => `<tr><td><button class="text-action product-choice" data-product-id="${escapeHtml(product.id)}">${escapeHtml(product.name)}</button>${product.isCompetitor ? '<span class="small-tag">منافس</span>' : ''}</td><td>${number(product.birds)}</td><td>${number(product.batches)}</td><td>${number(product.customers.size)}</td><td>${product.isCompetitor ? '—' : ampouleSummary(product)}</td></tr>`).join('');
+}
+
+function renderProductSlicer(filterKey, label, products, searchable = false) {
+  const selected = new Set(state.filters[filterKey]);
+  const search = searchable ? `<label class="slicer-search"><input id="competitor-product-search" type="search" aria-label="بحث منتجات المنافسين" value="${escapeHtml(state.competitorSearch)}" placeholder="بحث المنتجات"></label>` : '';
+  const options = products.map(([id, name]) => `<button type="button" class="slicer-chip" data-slicer="${filterKey}" data-product-id="${escapeHtml(id)}" aria-pressed="${selected.has(id)}">${escapeHtml(name)}</button>`).join('');
+  return `<section class="slicer-group"><div class="slicer-heading"><h3>${label}</h3><button type="button" class="button quiet" data-clear-slicer="${filterKey}">مسح الاختيار</button></div>${search}<div class="slicer-options" role="group" aria-label="${label}">${options || '<span class="slicer-empty">لا توجد منتجات</span>'}</div></section>`;
 }
 
 function renderRegionBars(regions) {
@@ -424,14 +448,36 @@ function bindDashboardEvents() {
   document.querySelector('#date-to').addEventListener('change', event => changeFilter('dateTo', event.target.value));
   document.querySelector('#region-filter').addEventListener('change', event => changeFilter('region', event.target.value));
   document.querySelector('#customer-filter').addEventListener('change', event => changeFilter('customerCode', event.target.value));
-  document.querySelector('#product-filter').addEventListener('change', event => changeFilter('productId', event.target.value));
+  document.querySelectorAll('[data-slicer]').forEach(button => button.addEventListener('click', () => {
+    const key = button.dataset.slicer;
+    const selected = new Set(state.filters[key]);
+    if (selected.has(button.dataset.productId)) selected.delete(button.dataset.productId);
+    else selected.add(button.dataset.productId);
+    state.filters[key] = [...selected];
+    state.page = 0;
+    renderDashboard();
+  }));
+  document.querySelectorAll('[data-clear-slicer]').forEach(button => button.addEventListener('click', () => {
+    state.filters[button.dataset.clearSlicer] = [];
+    state.page = 0;
+    renderDashboard();
+  }));
+  document.querySelector('#competitor-product-search')?.addEventListener('input', event => {
+    state.competitorSearch = event.target.value;
+    const position = event.target.selectionStart;
+    renderDashboard();
+    const input = document.querySelector('#competitor-product-search');
+    input?.focus();
+    input?.setSelectionRange(position, position);
+  });
   document.querySelectorAll('input[name="status"]').forEach(input => input.addEventListener('change', () => {
     state.filters.status = [...document.querySelectorAll('input[name="status"]:checked')].map(item => item.value);
     state.page = 0;
     renderDashboard();
   }));
   document.querySelector('#clear-filters').addEventListener('click', () => {
-    state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productId: '' };
+    state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [] };
+    state.competitorSearch = '';
     state.page = 0;
     state.selectedProductId = '';
     state.selectedCustomerCode = '';
@@ -553,7 +599,8 @@ if (!supabaseConfigured) {
       state.selectedProductId = '';
       state.selectedCustomerCode = '';
       state.search = '';
-      state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productId: '' };
+      state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [] };
+      state.competitorSearch = '';
       state.page = 0;
       state.customerMetric = 'birds';
       const dialog = document.querySelector('#batch-dialog');
