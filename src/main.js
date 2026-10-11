@@ -1,6 +1,7 @@
 import './styles.css';
 import { supabase, supabaseConfigured, supabaseConfigError } from './supabase.js';
 import { aggregateDashboard, customerLabel, durationMinutes, filterRows, getReportProducts, isKnownCustomer } from './dashboard-data.js';
+import { PRODUCT_TYPE_ORDER, productDisplay } from './product-catalog.js';
 
 const app = document.querySelector('#app');
 const state = {
@@ -24,7 +25,7 @@ const state = {
   selectedCustomerCode: '',
   customerMetric: 'birds',
   search: '',
-  filters: { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [] },
+  filters: { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [], yearIds: [] },
   competitorSearch: '',
 };
 let requestId = 0;
@@ -161,7 +162,7 @@ async function signOut() {
   state.page = 0;
   state.search = '';
   state.customerMetric = 'birds';
-  state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [] };
+  state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [], yearIds: [] };
   state.competitorSearch = '';
   state.selectedProductId = '';
   state.selectedCustomerCode = '';
@@ -203,7 +204,7 @@ async function loadDashboard() {
     }
     if (id !== requestId || !state.session) return;
     if (allRows.length !== expectedTotal || new Set(allRows.map(row => row.id)).size !== expectedTotal) throw new Error('Incomplete or duplicate report pages.');
-    state.rows = allRows;
+    state.rows = allRows.map(row => ({ ...row, products: (row.products || []).map(productDisplay) }));
     state.total = expectedTotal ?? 0;
     state.dateMin = metadata?.date_min ?? null;
     state.dateMax = metadata?.date_max ?? null;
@@ -258,13 +259,13 @@ function filterOptions(rows) {
   rows.forEach(row => (row.products || []).forEach(product => {
     if (!product.id || !product.name) return;
     products.set(product.id, product.name);
-    (product.is_competitor ? competitorProducts : ownProducts).set(product.id, product.name);
+    (product.is_competitor ? competitorProducts : ownProducts).set(product.id, { id: product.id, name: product.name, type: product.type || 'Other' });
   }));
-  const sortProducts = map => [...map.entries()].sort((a, b) => a[1].localeCompare(b[1], 'ar'));
+  const sortProducts = map => [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'en'));
   return {
     regions,
     customers: [...customerRows.entries()].sort((a, b) => customerLabel(a[1]).localeCompare(customerLabel(b[1]), 'ar')),
-    products: sortProducts(products),
+    products: [...products.entries()].sort((a, b) => a[1].localeCompare(b[1], 'en')),
     ownProducts: sortProducts(ownProducts),
     competitorProducts: sortProducts(competitorProducts),
   };
@@ -280,8 +281,10 @@ function renderDashboard() {
   const productDetailItems = options.products.map(([id, name]) => `<option value="${escapeHtml(id)}" ${state.selectedProductId === id ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
   const regionItems = options.regions.map(region => `<option value="${escapeHtml(region)}" ${regionValue === region ? 'selected' : ''}>${escapeHtml(region)}</option>`).join('');
   const customerItems = options.customers.map(([code, row]) => `<option value="${escapeHtml(code)}" ${state.filters.customerCode === code ? 'selected' : ''}>${escapeHtml(customerLabel(row))}</option>`).join('');
+  const years = uniqueSorted(state.rows.map(row => String(row.date || '').slice(0, 4)).filter(year => /^\d{4}$/.test(year))).sort((a, b) => b.localeCompare(a));
+  const yearSlicer = renderYearSlicer(years);
   const productSlicers = renderProductSlicer('productIds', 'منتجاتنا', options.ownProducts);
-  const filteredCompetitors = options.competitorProducts.filter(([, name]) => name.toLocaleLowerCase().includes(state.competitorSearch.toLocaleLowerCase()));
+  const filteredCompetitors = options.competitorProducts.filter(product => product.name.toLocaleLowerCase().includes(state.competitorSearch.toLocaleLowerCase()));
   const competitorProductSlicers = renderProductSlicer('competitorProductIds', 'منتجات المنافسين', filteredCompetitors, true);
   const statusNames = { accepted: 'معتمد', needs_review: 'بحاجة للمراجعة', rejected: 'مستبعد' };
   const knownStatuses = uniqueSorted(state.rows.map(row => row.status));
@@ -292,7 +295,7 @@ function renderDashboard() {
       <label>من تاريخ<input id="date-from" type="date" value="${escapeHtml(state.filters.dateFrom)}"></label><label>إلى تاريخ<input id="date-to" type="date" value="${escapeHtml(state.filters.dateTo)}"></label>
       <label>المنطقة التشغيلية<select id="region-filter"><option value="all">كل المناطق</option><option value="__unassigned__" ${regionValue === '__unassigned__' ? 'selected' : ''}>غير محددة</option>${regionItems}</select></label>
       <label>العميل / الكود<select id="customer-filter"><option value="">كل العملاء</option>${customerItems}</select></label>
-      <div class="product-slicers">${productSlicers}${competitorProductSlicers}</div>
+      <div class="product-slicers">${yearSlicer}${productSlicers}${competitorProductSlicers}</div>
       <fieldset class="status-filter"><legend>حالة التقرير</legend>${knownStatuses.map(status => `<label class="check-label"><input type="checkbox" name="status" value="${escapeHtml(status)}" ${state.filters.status.includes(status) ? 'checked' : ''}> ${escapeHtml(statusNames[status] || status)}</label>`).join('')}</fieldset>
     </div></section>
     ${state.error ? `<div class="alert error" role="alert">${escapeHtml(state.error)} <button id="retry" class="button quiet">إعادة المحاولة</button></div>` : ''}
@@ -316,8 +319,20 @@ function renderProductRows(products) {
 function renderProductSlicer(filterKey, label, products, searchable = false) {
   const selected = new Set(state.filters[filterKey]);
   const search = searchable ? `<label class="slicer-search"><input id="competitor-product-search" type="search" aria-label="بحث منتجات المنافسين" value="${escapeHtml(state.competitorSearch)}" placeholder="بحث المنتجات"></label>` : '';
-  const options = products.map(([id, name]) => `<button type="button" class="slicer-chip" data-slicer="${filterKey}" data-product-id="${escapeHtml(id)}" aria-pressed="${selected.has(id)}">${escapeHtml(name)}</button>`).join('');
+  const grouped = new Map();
+  products.forEach(product => {
+    const type = PRODUCT_TYPE_ORDER.includes(product.type) ? product.type : 'Other';
+    if (!grouped.has(type)) grouped.set(type, []);
+    grouped.get(type).push(product);
+  });
+  const options = PRODUCT_TYPE_ORDER.filter(type => grouped.has(type)).map(type => `<div class="slicer-category"><h4>${escapeHtml(type)}</h4><div class="slicer-options">${grouped.get(type).map(product => `<button type="button" class="slicer-chip" data-slicer="${filterKey}" data-product-id="${escapeHtml(product.id)}" aria-pressed="${selected.has(product.id)}">${escapeHtml(product.name)}</button>`).join('')}</div></div>`).join('');
   return `<section class="slicer-group"><div class="slicer-heading"><h3>${label}</h3><button type="button" class="button quiet" data-clear-slicer="${filterKey}">مسح الاختيار</button></div>${search}<div class="slicer-options" role="group" aria-label="${label}">${options || '<span class="slicer-empty">لا توجد منتجات</span>'}</div></section>`;
+}
+
+function renderYearSlicer(years) {
+  const selected = new Set(state.filters.yearIds);
+  const options = years.map(year => `<button type="button" class="slicer-chip" data-year-slicer="${year}" aria-pressed="${selected.has(year)}">${year}</button>`).join('');
+  return `<section class="slicer-group year-slicer"><div class="slicer-heading"><h3>السنة</h3><button type="button" class="button quiet" id="clear-years">مسح الاختيار</button></div><div class="slicer-options" role="group" aria-label="السنة">${options || '<span class="slicer-empty">لا توجد سنوات</span>'}</div></section>`;
 }
 
 function renderRegionBars(regions) {
@@ -462,6 +477,19 @@ function bindDashboardEvents() {
     state.page = 0;
     renderDashboard();
   }));
+  document.querySelectorAll('[data-year-slicer]').forEach(button => button.addEventListener('click', () => {
+    const selected = new Set(state.filters.yearIds);
+    if (selected.has(button.dataset.yearSlicer)) selected.delete(button.dataset.yearSlicer);
+    else selected.add(button.dataset.yearSlicer);
+    state.filters.yearIds = [...selected];
+    state.page = 0;
+    renderDashboard();
+  }));
+  document.querySelector('#clear-years').addEventListener('click', () => {
+    state.filters.yearIds = [];
+    state.page = 0;
+    renderDashboard();
+  });
   document.querySelector('#competitor-product-search')?.addEventListener('input', event => {
     state.competitorSearch = event.target.value;
     const position = event.target.selectionStart;
@@ -476,7 +504,7 @@ function bindDashboardEvents() {
     renderDashboard();
   }));
   document.querySelector('#clear-filters').addEventListener('click', () => {
-    state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [] };
+    state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [], yearIds: [] };
     state.competitorSearch = '';
     state.page = 0;
     state.selectedProductId = '';
@@ -599,7 +627,7 @@ if (!supabaseConfigured) {
       state.selectedProductId = '';
       state.selectedCustomerCode = '';
       state.search = '';
-      state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [] };
+      state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [], yearIds: [] };
       state.competitorSearch = '';
       state.page = 0;
       state.customerMetric = 'birds';

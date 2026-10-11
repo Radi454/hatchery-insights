@@ -16,6 +16,8 @@ export function filterRows(rows, filters = {}) {
     if (filters.customerCode && row.customer_code !== filters.customerCode) return false;
     const ownProductIds = filters.productIds ?? (filters.productId ? [filters.productId] : []);
     const competitorProductIds = filters.competitorProductIds ?? (filters.competitorProductId ? [filters.competitorProductId] : []);
+    const yearIds = Array.isArray(filters.yearIds) ? filters.yearIds : [];
+    if (yearIds.length && !yearIds.includes(String(row.date || '').slice(0, 4))) return false;
     if (ownProductIds.length && !row.products?.some(product => ownProductIds.includes(product.id) && !product.is_competitor)) return false;
     if (competitorProductIds.length && !row.products?.some(product => competitorProductIds.includes(product.id) && product.is_competitor)) return false;
     return true;

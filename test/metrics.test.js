@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { filterRows, aggregateDashboard, durationMinutes } from '../src/dashboard-data.js';
+import { PRODUCT_TYPE_ORDER, productDisplay } from '../src/product-catalog.js';
 
 const rows = [
   { id: 'r1', date: '2026-09-01', bird_count: 1000, status: 'accepted', customer_code: 'A-DK', customer: 'Alfa', region: 'Dakahlia', products: [{ id: 'v1', name: 'Product A', is_competitor: false, ampoule_count: 2 }, { id: 'v2', name: 'Product B', is_competitor: false, ampoule_count: 1 }, { id: 'v3', name: 'Competitor X', is_competitor: true, ampoule_count: null }] },
@@ -41,6 +42,28 @@ test('product slicers use OR within each group and AND across groups', () => {
   assert.deepEqual(filterRows(slicerRows, { productIds: ['own-a', 'own-b'], competitorProductIds: ['comp-x', 'comp-y'] }).map(row => row.id), ['both-a', 'both-b']);
   assert.deepEqual(filterRows(slicerRows, { productIds: ['own-a'], competitorProductIds: ['comp-y'] }), []);
   assert.deepEqual(filterRows(slicerRows, { productIds: [], competitorProductIds: [] }).map(row => row.id), slicerRows.map(row => row.id));
+});
+
+test('year slicer uses OR for selected years and intersects the date range', () => {
+  const yearRows = [
+    { id: '2025-a', date: '2025-01-01', status: 'accepted' },
+    { id: '2025-b', date: '2025-12-31', status: 'accepted' },
+    { id: '2026-a', date: '2026-01-01', status: 'accepted' },
+    { id: '2027-a', date: '2027-06-15', status: 'accepted' },
+  ];
+  assert.deepEqual(filterRows(yearRows, { yearIds: ['2025', '2027'] }).map(row => row.id), ['2025-a', '2025-b', '2027-a']);
+  assert.deepEqual(filterRows(yearRows, { yearIds: ['2025', '2027'], dateFrom: '2025-12-31', dateTo: '2027-01-01' }).map(row => row.id), ['2025-b']);
+  assert.deepEqual(filterRows(yearRows, { yearIds: [] }).map(row => row.id), yearRows.map(row => row.id));
+});
+
+test('product display uses English catalog names and verified categories', () => {
+  assert.deepEqual(PRODUCT_TYPE_ORDER.slice(0, 5), ['Recombinant vaccine', 'Marek', 'Live', 'Killed', 'Antibiotic']);
+  assert.deepEqual(productDisplay({ id: '6134be55-23f6-4606-8cfc-662fc70a8e74', name: 'كوبرا' }), {
+    id: '6134be55-23f6-4606-8cfc-662fc70a8e74', name: 'Vaxxitek COBRA', type: 'Recombinant vaccine',
+  });
+  assert.equal(productDisplay({ id: '86b535e4-eb95-4dc7-a527-31d95b5795d4', name: 'Newflend' }).type, 'Recombinant vaccine');
+  assert.equal(productDisplay({ id: '42c69074-b10e-4a6f-9087-96eedfb499da', name: 'Nextmune' }).type, 'Immune complex');
+  assert.equal(productDisplay({ id: 'unlisted', name: 'إينوفاكس' }).name, 'Innovax');
 });
 
 test('date filters include selected boundaries', () => {
