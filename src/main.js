@@ -351,20 +351,20 @@ function renderProductSlicer(filterKey, label, products, searchable = false) {
     grouped.get(type).push(product);
   });
   const options = PRODUCT_TYPE_ORDER.filter(type => grouped.has(type)).map(type => `<div class="slicer-category"><h4>${escapeHtml(type)}</h4><div class="slicer-options">${grouped.get(type).map(product => `<button type="button" class="slicer-chip" data-slicer="${filterKey}" data-product-id="${escapeHtml(product.id)}" aria-pressed="${selected.has(product.id)}">${escapeHtml(product.name)}</button>`).join('')}</div></div>`).join('');
-  return `<section class="slicer-group product-slicer"><div class="slicer-heading"><h3>${label}</h3><button type="button" class="button quiet" data-clear-slicer="${filterKey}">مسح الاختيار</button></div>${search}<div class="group-options" role="group" aria-label="${label}">${options || '<span class="slicer-empty">لا توجد منتجات</span>'}</div></section>`;
+  return `<section class="slicer-group product-slicer"><div class="slicer-heading"><h3>${label}</h3><button type="button" class="button quiet" data-clear-slicer="${filterKey}">مسح الفلتر</button></div>${search}<div class="group-options" role="group" aria-label="${label}">${options || '<span class="slicer-empty">لا توجد منتجات</span>'}</div></section>`;
 }
 
 function renderYearSlicer(years) {
   const selected = new Set(state.filters.yearIds);
   const options = years.map(year => `<button type="button" class="slicer-chip" data-year-slicer="${year}" aria-pressed="${selected.has(year)}">${year}</button>`).join('');
-  return `<section class="slicer-group year-slicer"><div class="slicer-heading"><h3>السنة</h3><button type="button" class="button quiet" id="clear-years">مسح الاختيار</button></div><div class="slicer-options" role="group" aria-label="السنة">${options || '<span class="slicer-empty">لا توجد سنوات</span>'}</div></section>`;
+  return `<section class="slicer-group year-slicer"><div class="slicer-heading"><h3>السنة</h3><button type="button" class="button quiet" id="clear-years">مسح الفلتر</button></div><div class="slicer-options" role="group" aria-label="السنة">${options || '<span class="slicer-empty">لا توجد سنوات</span>'}</div></section>`;
 }
 
 function renderMonthSlicer(months) {
   const labels = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
   const selected = new Set(state.filters.monthIds);
   const options = months.map(month => `<button type="button" class="slicer-chip" data-month-slicer="${month}" aria-pressed="${selected.has(month)}">${labels[Number(month) - 1]}</button>`).join('');
-  return `<section class="slicer-group period-slicer"><div class="slicer-heading"><h3>الشهر</h3><button type="button" class="button quiet" id="clear-months">مسح الاختيار</button></div><div class="slicer-options" role="group" aria-label="الشهر">${options || '<span class="slicer-empty">لا توجد أشهر</span>'}</div></section>`;
+  return `<section class="slicer-group period-slicer"><div class="slicer-heading"><h3>الشهر</h3><button type="button" class="button quiet" id="clear-months">مسح الفلتر</button></div><div class="slicer-options" role="group" aria-label="الشهر">${options || '<span class="slicer-empty">لا توجد أشهر</span>'}</div></section>`;
 }
 
 function renderRegionBars(regions) {
