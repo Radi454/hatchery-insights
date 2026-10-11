@@ -1,12 +1,14 @@
 import './styles.css';
 import { supabase, supabaseConfigured, supabaseConfigError } from './supabase.js';
-import { aggregateDashboard, customerLabel, durationMinutes, filterRows, getReportProducts, isKnownCustomer } from './dashboard-data.js';
+import { aggregateDashboard, availableMonths, buildAmpouleRates, customerLabel, durationMinutes, estimateAmpoules, filterRows, getReportProducts, isKnownCustomer, latestAvailableYear } from './dashboard-data.js';
 import { PRODUCT_TYPE_ORDER, productDisplay } from './product-catalog.js';
 
 const app = document.querySelector('#app');
 const state = {
   session: null,
   rows: [],
+  ampouleRates: new Map(),
+  yearDefaultInitialized: false,
   total: 0,
   dateMin: null,
   dateMax: null,
@@ -25,7 +27,7 @@ const state = {
   selectedCustomerCode: '',
   customerMetric: 'birds',
   search: '',
-  filters: { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [], yearIds: [] },
+  filters: { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [], yearIds: [], monthIds: [] },
   competitorSearch: '',
 };
 let requestId = 0;
@@ -33,7 +35,16 @@ let sourceRequestId = 0;
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const number = value => new Intl.NumberFormat('en-US').format(Number(value) || 0);
-const ampouleSummary = item => !item.ampoulesKnown ? 'غير مسجل' : item.ampoulesIncomplete ? `المسجل فقط: ${number(item.ampoules)}` : number(item.ampoules);
+function ampouleSummary(item) {
+  const result = estimateAmpoules(item, state.ampouleRates);
+  if (result.status === 'exact') return number(result.value);
+  if (result.status === 'estimated') {
+    const rate = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(result.birdsPerAmpoule);
+    const title = `تقدير من ${number(result.sampleReports)} تقرير معتمد · ${rate} طائر لكل أمبولة`;
+    return `<span title="${title}" aria-label="${title}">≈ ${number(result.value)} (تقديري)</span><small class="ampoule-recorded">المسجل: ${number(result.recorded)} أمبولة</small>`;
+  }
+  return result.status === 'recorded' ? `المسجل فقط: ${number(result.recorded)}` : 'غير مسجل';
+}
 const birds = value => `${number(value)} طائر`;
 const dateLabel = value => value ? new Intl.DateTimeFormat('ar-EG', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`)) : '—';
 const monthLabel = value => value ? new Intl.DateTimeFormat('ar-EG', { year: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${value}-01T00:00:00Z`)) : '—';
@@ -146,6 +157,8 @@ async function signOut() {
   const dialogContent = document.querySelector('#dialog-content');
   if (dialogContent) dialogContent.replaceChildren();
   state.rows = [];
+  state.ampouleRates = new Map();
+  state.yearDefaultInitialized = false;
   state.total = 0;
   state.dateMin = null;
   state.dateMax = null;
@@ -162,7 +175,7 @@ async function signOut() {
   state.page = 0;
   state.search = '';
   state.customerMetric = 'birds';
-  state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [], yearIds: [] };
+  state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [], yearIds: [], monthIds: [] };
   state.competitorSearch = '';
   state.selectedProductId = '';
   state.selectedCustomerCode = '';
@@ -205,6 +218,12 @@ async function loadDashboard() {
     if (id !== requestId || !state.session) return;
     if (allRows.length !== expectedTotal || new Set(allRows.map(row => row.id)).size !== expectedTotal) throw new Error('Incomplete or duplicate report pages.');
     state.rows = allRows.map(row => ({ ...row, products: (row.products || []).map(productDisplay) }));
+    state.ampouleRates = buildAmpouleRates(state.rows);
+    if (!state.yearDefaultInitialized) {
+      const latestYear = latestAvailableYear(state.rows);
+      state.filters.yearIds = latestYear ? [latestYear] : [];
+      state.yearDefaultInitialized = true;
+    }
     state.total = expectedTotal ?? 0;
     state.dateMin = metadata?.date_min ?? null;
     state.dateMax = metadata?.date_max ?? null;
@@ -239,6 +258,11 @@ function renderLoading() {
 function currentRows() {
   const filters = { ...state.filters, status: [...state.filters.status] };
   return filterRows(state.rows, filters);
+}
+
+function pruneMonths() {
+  const available = new Set(availableMonths(state.rows, state.filters.yearIds));
+  state.filters.monthIds = state.filters.monthIds.filter(month => available.has(month));
 }
 
 function uniqueSorted(values) {
@@ -283,6 +307,7 @@ function renderDashboard() {
   const customerItems = options.customers.map(([code, row]) => `<option value="${escapeHtml(code)}" ${state.filters.customerCode === code ? 'selected' : ''}>${escapeHtml(customerLabel(row))}</option>`).join('');
   const years = uniqueSorted(state.rows.map(row => String(row.date || '').slice(0, 4)).filter(year => /^\d{4}$/.test(year))).sort((a, b) => b.localeCompare(a));
   const yearSlicer = renderYearSlicer(years);
+  const monthSlicer = renderMonthSlicer(availableMonths(state.rows, state.filters.yearIds));
   const productSlicers = renderProductSlicer('productIds', 'منتجاتنا', options.ownProducts);
   const filteredCompetitors = options.competitorProducts.filter(product => product.name.toLocaleLowerCase().includes(state.competitorSearch.toLocaleLowerCase()));
   const competitorProductSlicers = renderProductSlicer('competitorProductIds', 'منتجات المنافسين', filteredCompetitors, true);
@@ -291,11 +316,11 @@ function renderDashboard() {
   const pendingReviewCount = state.rows.filter(row => row.status === 'needs_review').length;
   document.querySelector('#main-content').innerHTML = `
     <div class="page-heading"><div><h1>تقارير التحصين</h1></div><button id="export-csv" class="button outline">تصدير CSV</button></div>
-    <section class="filters panel" aria-label="مرشحات التقارير"><div class="filter-title"><div><h2>المرشحات</h2></div><button id="clear-filters" class="button quiet">مسح المرشحات</button></div><div class="filter-grid">
+    <section class="filters panel" aria-label="الفلاتر"><div class="filter-title"><div><h2>الفلاتر</h2></div><button id="clear-filters" class="button quiet">مسح الفلاتر</button></div><div class="filter-grid">
       <label>من تاريخ<input id="date-from" type="date" value="${escapeHtml(state.filters.dateFrom)}"></label><label>إلى تاريخ<input id="date-to" type="date" value="${escapeHtml(state.filters.dateTo)}"></label>
       <label>المنطقة التشغيلية<select id="region-filter"><option value="all">كل المناطق</option><option value="__unassigned__" ${regionValue === '__unassigned__' ? 'selected' : ''}>غير محددة</option>${regionItems}</select></label>
       <label>العميل / الكود<select id="customer-filter"><option value="">كل العملاء</option>${customerItems}</select></label>
-      <div class="product-slicers">${yearSlicer}${productSlicers}${competitorProductSlicers}</div>
+      <div class="slicer-filters">${yearSlicer}${monthSlicer}${productSlicers}${competitorProductSlicers}</div>
       <fieldset class="status-filter"><legend>حالة التقرير</legend>${knownStatuses.map(status => `<label class="check-label"><input type="checkbox" name="status" value="${escapeHtml(status)}" ${state.filters.status.includes(status) ? 'checked' : ''}> ${escapeHtml(statusNames[status] || status)}</label>`).join('')}</fieldset>
     </div></section>
     ${state.error ? `<div class="alert error" role="alert">${escapeHtml(state.error)} <button id="retry" class="button quiet">إعادة المحاولة</button></div>` : ''}
@@ -326,13 +351,20 @@ function renderProductSlicer(filterKey, label, products, searchable = false) {
     grouped.get(type).push(product);
   });
   const options = PRODUCT_TYPE_ORDER.filter(type => grouped.has(type)).map(type => `<div class="slicer-category"><h4>${escapeHtml(type)}</h4><div class="slicer-options">${grouped.get(type).map(product => `<button type="button" class="slicer-chip" data-slicer="${filterKey}" data-product-id="${escapeHtml(product.id)}" aria-pressed="${selected.has(product.id)}">${escapeHtml(product.name)}</button>`).join('')}</div></div>`).join('');
-  return `<section class="slicer-group"><div class="slicer-heading"><h3>${label}</h3><button type="button" class="button quiet" data-clear-slicer="${filterKey}">مسح الاختيار</button></div>${search}<div class="slicer-options" role="group" aria-label="${label}">${options || '<span class="slicer-empty">لا توجد منتجات</span>'}</div></section>`;
+  return `<section class="slicer-group product-slicer"><div class="slicer-heading"><h3>${label}</h3><button type="button" class="button quiet" data-clear-slicer="${filterKey}">مسح الاختيار</button></div>${search}<div class="group-options" role="group" aria-label="${label}">${options || '<span class="slicer-empty">لا توجد منتجات</span>'}</div></section>`;
 }
 
 function renderYearSlicer(years) {
   const selected = new Set(state.filters.yearIds);
   const options = years.map(year => `<button type="button" class="slicer-chip" data-year-slicer="${year}" aria-pressed="${selected.has(year)}">${year}</button>`).join('');
   return `<section class="slicer-group year-slicer"><div class="slicer-heading"><h3>السنة</h3><button type="button" class="button quiet" id="clear-years">مسح الاختيار</button></div><div class="slicer-options" role="group" aria-label="السنة">${options || '<span class="slicer-empty">لا توجد سنوات</span>'}</div></section>`;
+}
+
+function renderMonthSlicer(months) {
+  const labels = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  const selected = new Set(state.filters.monthIds);
+  const options = months.map(month => `<button type="button" class="slicer-chip" data-month-slicer="${month}" aria-pressed="${selected.has(month)}">${labels[Number(month) - 1]}</button>`).join('');
+  return `<section class="slicer-group period-slicer"><div class="slicer-heading"><h3>الشهر</h3><button type="button" class="button quiet" id="clear-months">مسح الاختيار</button></div><div class="slicer-options" role="group" aria-label="الشهر">${options || '<span class="slicer-empty">لا توجد أشهر</span>'}</div></section>`;
 }
 
 function renderRegionBars(regions) {
@@ -482,11 +514,26 @@ function bindDashboardEvents() {
     if (selected.has(button.dataset.yearSlicer)) selected.delete(button.dataset.yearSlicer);
     else selected.add(button.dataset.yearSlicer);
     state.filters.yearIds = [...selected];
+    pruneMonths();
     state.page = 0;
     renderDashboard();
   }));
   document.querySelector('#clear-years').addEventListener('click', () => {
     state.filters.yearIds = [];
+    pruneMonths();
+    state.page = 0;
+    renderDashboard();
+  });
+  document.querySelectorAll('[data-month-slicer]').forEach(button => button.addEventListener('click', () => {
+    const selected = new Set(state.filters.monthIds);
+    if (selected.has(button.dataset.monthSlicer)) selected.delete(button.dataset.monthSlicer);
+    else selected.add(button.dataset.monthSlicer);
+    state.filters.monthIds = [...selected];
+    state.page = 0;
+    renderDashboard();
+  }));
+  document.querySelector('#clear-months').addEventListener('click', () => {
+    state.filters.monthIds = [];
     state.page = 0;
     renderDashboard();
   });
@@ -504,7 +551,10 @@ function bindDashboardEvents() {
     renderDashboard();
   }));
   document.querySelector('#clear-filters').addEventListener('click', () => {
-    state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [], yearIds: [] };
+    state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [], yearIds: [], monthIds: [] };
+    const latestYear = latestAvailableYear(state.rows);
+    state.filters.yearIds = latestYear ? [latestYear] : [];
+    state.yearDefaultInitialized = true;
     state.competitorSearch = '';
     state.page = 0;
     state.selectedProductId = '';
@@ -627,7 +677,9 @@ if (!supabaseConfigured) {
       state.selectedProductId = '';
       state.selectedCustomerCode = '';
       state.search = '';
-      state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [], yearIds: [] };
+      state.filters = { status: ['accepted'], dateFrom: '', dateTo: '', region: 'all', customerCode: '', productIds: [], competitorProductIds: [], yearIds: [], monthIds: [] };
+      state.ampouleRates = new Map();
+      state.yearDefaultInitialized = false;
       state.competitorSearch = '';
       state.page = 0;
       state.customerMetric = 'birds';

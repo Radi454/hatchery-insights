@@ -17,11 +17,65 @@ export function filterRows(rows, filters = {}) {
     const ownProductIds = filters.productIds ?? (filters.productId ? [filters.productId] : []);
     const competitorProductIds = filters.competitorProductIds ?? (filters.competitorProductId ? [filters.competitorProductId] : []);
     const yearIds = Array.isArray(filters.yearIds) ? filters.yearIds : [];
+    const monthIds = Array.isArray(filters.monthIds) ? filters.monthIds : [];
     if (yearIds.length && !yearIds.includes(String(row.date || '').slice(0, 4))) return false;
+    if (monthIds.length && !monthIds.includes(String(row.date || '').slice(5, 7))) return false;
     if (ownProductIds.length && !row.products?.some(product => ownProductIds.includes(product.id) && !product.is_competitor)) return false;
     if (competitorProductIds.length && !row.products?.some(product => competitorProductIds.includes(product.id) && product.is_competitor)) return false;
     return true;
   });
+}
+
+export function latestAvailableYear(rows) {
+  return [...new Set(rows.map(row => String(row.date || '').slice(0, 4)).filter(year => /^\d{4}$/.test(year)))].sort((a, b) => b.localeCompare(a))[0] || '';
+}
+
+export function availableMonths(rows, yearIds = []) {
+  return [...new Set(rows.filter(row => !yearIds.length || yearIds.includes(String(row.date || '').slice(0, 4)))
+    .map(row => String(row.date || '').slice(5, 7)).filter(month => /^(0[1-9]|1[0-2])$/.test(month)))].sort();
+}
+
+export function buildAmpouleRates(referenceRows) {
+  const uniqueRows = [...new Map(referenceRows.map((row, index) => [row.id ?? `missing:${index}`, row])).values()];
+  const totals = new Map();
+  for (const row of uniqueRows) {
+    const birds = Number(row.bird_count);
+    if (row.status !== 'accepted' || !Number.isFinite(birds) || birds <= 0) continue;
+    const products = new Map();
+    for (const item of row.products || []) {
+      if (item.is_competitor || !item.name) continue;
+      const key = String(item.id || item.name);
+      const group = products.get(key) || { quantities: [] };
+      group.quantities.push(item.ampoule_count);
+      products.set(key, group);
+    }
+    for (const [key, group] of products) {
+      const quantities = group.quantities.map(value => value == null || String(value).trim() === '' ? NaN : Number(value));
+      if (quantities.some(value => !Number.isFinite(value) || value <= 0)) continue;
+      const ampoules = quantities.reduce((sum, value) => sum + value, 0);
+      if (ampoules <= 0) continue;
+      const total = totals.get(key) || { birds: 0, ampoules: 0, samples: 0 };
+      total.birds += birds;
+      total.ampoules += ampoules;
+      total.samples += 1;
+      totals.set(key, total);
+    }
+  }
+  return new Map([...totals.entries()].map(([key, total]) => [key, { ...total, birdsPerAmpoule: total.birds / total.ampoules }]));
+}
+
+export function estimateAmpoules(summary, rates) {
+  const recorded = Number(summary.ampoules) || 0;
+  if (!summary.ampoulesIncomplete) return { status: summary.ampoulesKnown ? 'exact' : 'unavailable', value: summary.ampoulesKnown ? recorded : null, recorded };
+  const rate = rates?.get(String(summary.id));
+  if (!rate || !(Number(summary.birds) > 0)) return { status: recorded > 0 ? 'recorded' : 'unavailable', value: null, recorded };
+  return {
+    status: 'estimated',
+    value: Math.round((Number(summary.birds) / rate.birdsPerAmpoule) * 100) / 100,
+    recorded,
+    sampleReports: rate.samples,
+    birdsPerAmpoule: rate.birdsPerAmpoule,
+  };
 }
 
 export function aggregateDashboard(rows) {

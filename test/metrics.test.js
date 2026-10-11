@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { filterRows, aggregateDashboard, durationMinutes } from '../src/dashboard-data.js';
+import { filterRows, aggregateDashboard, durationMinutes, availableMonths, latestAvailableYear, buildAmpouleRates, estimateAmpoules } from '../src/dashboard-data.js';
 import { PRODUCT_TYPE_ORDER, productDisplay } from '../src/product-catalog.js';
 
 const rows = [
@@ -54,6 +54,42 @@ test('year slicer uses OR for selected years and intersects the date range', () 
   assert.deepEqual(filterRows(yearRows, { yearIds: ['2025', '2027'] }).map(row => row.id), ['2025-a', '2025-b', '2027-a']);
   assert.deepEqual(filterRows(yearRows, { yearIds: ['2025', '2027'], dateFrom: '2025-12-31', dateTo: '2027-01-01' }).map(row => row.id), ['2025-b']);
   assert.deepEqual(filterRows(yearRows, { yearIds: [] }).map(row => row.id), yearRows.map(row => row.id));
+});
+
+test('latest year default and month availability follow the selected years', () => {
+  const dated = [
+    { id: 'a', date: '2025-02-01', status: 'accepted' },
+    { id: 'b', date: '2025-11-01', status: 'accepted' },
+    { id: 'c', date: '2026-03-01', status: 'accepted' },
+    { id: 'd', date: '2026-09-01', status: 'accepted' },
+  ];
+  assert.equal(latestAvailableYear(dated), '2026');
+  assert.deepEqual(availableMonths(dated, ['2026']), ['03', '09']);
+  assert.deepEqual(availableMonths(dated, []), ['02', '03', '09', '11']);
+  assert.deepEqual(filterRows(dated, { yearIds: ['2025', '2026'], monthIds: ['03', '11'], dateFrom: '2025-10-01' }).map(row => row.id), ['b', 'c']);
+  assert.deepEqual(filterRows(dated, { yearIds: ['2026'], monthIds: ['02', '09'] }).map(row => row.id), ['d']);
+});
+
+test('ampoule rates are weighted by accepted report birds and all valid product lines', () => {
+  const references = [
+    { id: 'cal-1', status: 'accepted', bird_count: 1000, products: [
+      { id: 'v1', name: 'Product A', ampoule_count: 2 }, { id: 'v1', name: 'Product A', ampoule_count: 3 },
+      { id: 'competitor', name: 'Competitor', is_competitor: true, ampoule_count: 100 },
+    ] },
+    { id: 'cal-2', status: 'accepted', bird_count: 3000, products: [{ id: 'v1', name: 'Product A', ampoule_count: 10 }] },
+    { id: 'review', status: 'needs_review', bird_count: 9000, products: [{ id: 'v1', name: 'Product A', ampoule_count: 1 }] },
+    { id: 'partial', status: 'accepted', bird_count: 2000, products: [{ id: 'v1', name: 'Product A', ampoule_count: 5 }, { id: 'v1', name: 'Product A' }] },
+    { id: 'zero', status: 'accepted', bird_count: 2000, products: [{ id: 'v1', name: 'Product A', ampoule_count: 0 }] },
+    { id: 'bad-birds', status: 'accepted', bird_count: null, products: [{ id: 'v1', name: 'Product A', ampoule_count: 10 }] },
+  ];
+  const rates = buildAmpouleRates(references);
+  assert.deepEqual(rates.get('v1'), { birds: 4000, ampoules: 15, samples: 2, birdsPerAmpoule: 4000 / 15 });
+  assert.equal(rates.has('competitor'), false);
+  assert.equal(estimateAmpoules({ id: 'v1', birds: 1000, ampoules: 2, ampoulesKnown: 1, ampoulesIncomplete: true }, rates).value, 3.75);
+  assert.equal(estimateAmpoules({ id: 'v1', birds: 1000, ampoules: 4, ampoulesKnown: 1, ampoulesIncomplete: false }, rates).status, 'exact');
+  assert.equal(estimateAmpoules({ id: 'unseen', birds: 1000, ampoules: 1, ampoulesKnown: 1, ampoulesIncomplete: true }, rates).status, 'recorded');
+  assert.equal(estimateAmpoules({ id: 'unseen', birds: 1000, ampoules: 0, ampoulesKnown: 0, ampoulesIncomplete: true }, rates).status, 'unavailable');
+  assert.equal(buildAmpouleRates([{ id: 'only-partial', status: 'accepted', bird_count: 500, products: [{ id: 'x', name: 'X', ampoule_count: 2 }, { id: 'x', name: 'X' }] }]).size, 0);
 });
 
 test('product display uses English catalog names and verified categories', () => {
