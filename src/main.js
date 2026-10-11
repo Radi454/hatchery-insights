@@ -40,19 +40,21 @@ const monthKey = date => date ? String(date).slice(0, 7) : '';
 
 function renderShell() {
   app.innerHTML = `
-    <header class="topbar"><a class="brand" href="#" aria-label="Hatchery Insights"><span class="brand-word">Zoetis</span><span class="brand-copy">Hatchery Insights<small>لوحة متابعة التحصين</small></span></a><div id="session-tools"></div></header>
+    <header class="topbar"><div class="brand" aria-label="Hatchery Insights"><span class="brand-mark" aria-hidden="true">م</span><span class="brand-copy">Hatchery Insights<small>متابعة معامل التفريخ</small></span></div><div id="session-tools"></div></header>
     <main id="main-content" class="container"></main>
-    <footer class="footer"><span>Hatchery Insights · مساحة عمل داخلية</span><span>مصدر البيانات: تقارير معامل التفريخ</span></footer>
+    <footer class="footer"><span>مساحة عمل داخلية</span><span>مصدر البيانات: تقارير معامل التفريخ</span></footer>
     <dialog id="batch-dialog" class="dialog"><div id="dialog-content"></div></dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>`;
-  document.querySelector('.brand').addEventListener('click', event => event.preventDefault());
 }
 
 function renderLogin() {
   document.querySelector('#session-tools').innerHTML = '';
+  document.querySelector('#main-content').classList.add('login-main');
   document.querySelector('#main-content').innerHTML = `
-    <section class="login-wrap"><form id="login-form" class="login-card">
-      <div class="eyebrow">تسجيل دخول آمن</div><h1>مرحبًا بعودتك</h1><p class="muted">استخدم حسابك الحالي لمراجعة بيانات التقارير.</p>
+    <section class="login-page" aria-label="تسجيل الدخول إلى لوحة التحصين">
+      <div class="login-visual"><img src="${import.meta.env.BASE_URL}assets/chicks.jpg" alt="كتاكيت في المفرخ"><div class="login-visual-copy"><span>معامل التفريخ</span><h2>متابعة أوضح<br>لتحصين الدواجن</h2><p>لوحة داخلية لمراجعة التقارير والدفعات المسجلة.</p></div></div>
+      <div class="login-side"><form id="login-form" class="login-card">
+      <div class="login-emblem" aria-hidden="true">م</div><div class="eyebrow">بوابة آمنة</div><h1>أهلًا بك</h1><p class="muted">سجّل الدخول لمتابعة بيانات معامل التفريخ.</p>
       ${!supabaseConfigured ? `<div class="alert error">${escapeHtml(supabaseConfigError || 'إعداد الاتصال غير مكتمل. أضف VITE_SUPABASE_URL ومفتاحًا عامًا يبدأ بـ sb_publishable_ إلى بيئة التشغيل.')}</div>` : ''}
       ${state.error ? `<div class="alert error" role="alert">${escapeHtml(state.error)}</div>` : ''}
       <label>البريد الإلكتروني<input name="email" type="email" autocomplete="username" value="${escapeHtml(state.otpEmail)}" required ${!supabaseConfigured || state.loading ? 'disabled' : ''}></label>
@@ -61,7 +63,8 @@ function renderLogin() {
       ${state.authMode === 'password' ? '<button id="otp-mode" class="button quiet full" type="button">الدخول عبر البريد</button>' : state.authMode === 'otp-email' ? '<button id="code-entry" class="button quiet full" type="button">لدي رمز دخول</button>' : '<button id="resend-otp" class="button quiet full" type="button">إرسال رمز جديد</button>'}
       ${state.authMode !== 'password' ? '<button id="password-mode" class="button quiet full" type="button">الدخول بكلمة المرور</button>' : ''}
       <p class="fineprint">الدخول متاح للحسابات المصرح بها فقط. إنشاء الحسابات غير متاح من هذه الصفحة.</p>
-    </form></section>`;
+      </form><p class="login-footnote">لوحة داخلية لمتابعة تقارير التحصين</p></div>
+    </section>`;
   document.querySelector('#login-form')?.addEventListener('submit', signIn);
   document.querySelector('#otp-mode')?.addEventListener('click', () => { state.otpEmail = document.querySelector('[name="email"]')?.value || ''; state.authMode = 'otp-email'; state.error = ''; renderLogin(); });
   document.querySelector('#code-entry')?.addEventListener('click', () => { state.otpEmail = document.querySelector('[name="email"]')?.value || ''; state.authMode = 'code'; state.error = ''; renderLogin(); });
@@ -226,6 +229,7 @@ async function loadDashboard() {
 }
 
 function renderLoading() {
+  document.querySelector('#main-content').classList.remove('login-main');
   document.querySelector('#main-content').innerHTML = '<section class="panel loading-card"><div class="spinner" aria-hidden="true"></div><p>جارٍ تحميل بيانات التقارير…</p></section>';
 }
 
@@ -252,6 +256,7 @@ function filterOptions(rows) {
 }
 
 function renderDashboard() {
+  document.querySelector('#main-content').classList.remove('login-main');
   sessionBar();
   const rows = currentRows();
   const stats = aggregateDashboard(rows);
