@@ -49,9 +49,11 @@
 .slicer-search input{width:100%;height:34px;border:1px solid #d9dee7;border-radius:7px;padding:0 9px;font-size:10px}
 .slicer-empty{padding:8px;color:var(--muted);font-size:10px}
 .slicer-filters .period-slicer,.slicer-filters .year-slicer{grid-column:1/-1}
-.slicer-filters .product-slicer .group-options{display:block;max-height:220px;overflow:auto}
+.slicer-filters .product-slicer{height:220px;display:flex;flex-direction:column}
+.product-slicer>.slicer-heading,.product-slicer>.slicer-search{flex-shrink:0}
+.slicer-filters .product-slicer .group-options{display:block;flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-gutter:stable}
 .slicer-category+.slicer-category{border-top:1px solid #edf0f3;margin-top:7px;padding-top:7px}
 .slicer-category h4{margin:0 0 5px;color:var(--muted);font-size:9px;font-weight:600}
 .slicer-category .slicer-options{display:flex;flex-wrap:wrap;gap:6px;max-height:none;overflow:visible;padding:0}
 .ampoule-recorded{display:block;color:var(--muted);font-size:8px;margin-top:3px}
-@media(max-width:760px){.slicer-filters{grid-template-columns:1fr}.slicer-filters .product-slicer .group-options{max-height:190px}}
+@media(max-width:760px){.slicer-filters{grid-template-columns:1fr}}
